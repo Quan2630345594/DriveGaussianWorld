@@ -158,7 +158,9 @@ def load_scene_artifact(output_dir, metadata):
     output_dir = Path(output_dir)
     direct = output_dir / 'scene.npz'
     if direct.is_file():
-        return Scene.load(direct)
+        with np.load(direct, allow_pickle=False) as data:
+            has_metadata = 'metadata' in data.files
+        return Scene.load(direct) if has_metadata else _load_npz(direct, metadata)
     candidates = sorted(output_dir.rglob('*.npz'))
     for candidate in candidates:
         try:
@@ -169,6 +171,46 @@ def load_scene_artifact(output_dir, metadata):
     if plys:
         return _load_ply(plys[0], metadata)
     raise FileNotFoundError('Feed-forward output must contain scene.npz, a Gaussian NPZ, or a PLY')
+
+
+def transform_scene(scene, scale, rotation, translation):
+    """Return a similarity-transformed scene using a 3x3 R and wxyz quaternions.
+
+    Means become ``scale * R @ mean + translation`` and covariances become
+    ``scale**2 * R @ covariance @ R.T``. Scene metadata is retained unchanged.
+    """
+    scale = float(scale)
+    rotation = np.asarray(rotation, dtype=float)
+    translation = np.asarray(translation, dtype=float)
+    if not np.isfinite(scale) or scale <= 0:
+        raise ValueError('metric_scale must be a positive finite number')
+    if (rotation.shape != (3, 3) or not np.isfinite(rotation).all()
+            or not np.allclose(rotation.T @ rotation, np.eye(3), atol=1e-4, rtol=0)
+            or not np.isclose(np.linalg.det(rotation), 1.0, atol=1e-4, rtol=0)):
+        raise ValueError('world_rotation must be a finite proper 3x3 rotation (determinant +1)')
+    if translation.shape != (3,) or not np.isfinite(translation).all():
+        raise ValueError('world_translation must contain three finite values')
+
+    # The largest eigenvector gives a stable wxyz quaternion, including at pi.
+    trace = np.trace(rotation)
+    skew = np.array([rotation[2, 1] - rotation[1, 2],
+                     rotation[0, 2] - rotation[2, 0],
+                     rotation[1, 0] - rotation[0, 1]])
+    matrix = np.empty((4, 4))
+    matrix[0, 0] = trace
+    matrix[0, 1:] = matrix[1:, 0] = skew
+    matrix[1:, 1:] = rotation + rotation.T - trace * np.eye(3)
+    _, vectors = np.linalg.eigh(matrix)
+    w, xyz = vectors[0, -1], vectors[1:, -1]
+    quats = np.asarray(scene.quats, dtype=float)
+    quats = quats / np.linalg.norm(quats, axis=1, keepdims=True)
+    # Left-compose the world rotation with each Gaussian's local orientation.
+    composed = np.column_stack((w * quats[:, 0] - quats[:, 1:] @ xyz,
+                                w * quats[:, 1:] + quats[:, :1] * xyz
+                                + np.cross(xyz, quats[:, 1:])))
+    return Scene(scale * (scene.means @ rotation.T) + translation,
+                 scene.scales * scale, composed, scene.colors, scene.opacities,
+                 dict(scene.metadata)).validate()
 
 
 def _metadata(config, scene, backend, manifest):
@@ -227,19 +269,9 @@ def reconstruct_video(video, output_dir, backend='dggt', repo=None, checkpoint=N
     # then attach the project-level task configuration.
     provisional = load_scene_artifact(output_dir, dict(units='meters', up_axis='z'))
     cfg = dict(config or {})
-    scale = float(cfg.get('metric_scale', 1.0))
-    if not np.isfinite(scale) or scale <= 0:
-        raise ValueError('metric_scale must be a positive finite number')
-    rotation = np.asarray(cfg.get('world_rotation', np.eye(3)), dtype=float)
-    translation = np.asarray(cfg.get('world_translation', [0, 0, 0]), dtype=float)
-    if rotation.shape != (3, 3) or not np.allclose(rotation.T @ rotation, np.eye(3), atol=1e-4):
-        raise ValueError('world_rotation must be a 3x3 orthonormal matrix')
-    if translation.shape != (3,) or not np.isfinite(translation).all():
-        raise ValueError('world_translation must contain three finite values')
-    means = scale * (provisional.means @ rotation.T) + translation
-    provisional = Scene(means, provisional.scales * scale, provisional.quats,
-                        provisional.colors, provisional.opacities,
-                        dict(units='meters', up_axis='z')).validate()
+    provisional = transform_scene(provisional, cfg.get('metric_scale', 1.0),
+                                  cfg.get('world_rotation', np.eye(3)),
+                                  cfg.get('world_translation', [0, 0, 0]))
     metadata = _metadata(config, provisional, backend, manifest)
     scene = Scene(provisional.means, provisional.scales, provisional.quats,
                   provisional.colors, provisional.opacities, metadata).validate()
