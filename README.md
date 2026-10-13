@@ -1,73 +1,93 @@
-# Gaussian Park
+# GaussianParkWorld
 
-车载停车场图像 -> DGGT 高斯重建 -> 风险栅格 -> Hybrid A* -> 跟踪仿真。
-实验使用 ParkingE2E 真实车载泊车记录，并与记录的参考轨迹比较。
-前端是原生 HTML/JS，不需要 Node.js。
+项目转向世界模型训练，目前仅保留第一方高斯渲染接口及必要辅助代码。
+停车建图、规划、控制、仿真、诊断、数据准备和预训练重建入口已移除。
+现有数据、权重、历史实验输出和第三方源码保留，不属于当前第一方执行流程。
+Python 包名为 `gaussian_park_world`，不再包含停车业务。
 
-## 环境
+## 保留接口
+
+```text
+gaussian_park_world/
+  common/experiments.py        渲染实验目录
+  rendering/
+    renderer.py               整图渲染、相机加载/插值、视频编码
+    preprocessing.py          离线指标所需的参考图预处理
+scripts/rendering/render.py    离线整图渲染入口
+```
+
+### 整图渲染
+
+```python
+import numpy as np
+from PIL import Image
+from gaussian_park_world.rendering.renderer import Renderer
+
+renderer = Renderer("scene.npz", width=640, height=360)
+pose = np.eye(4)  # Optical camera-to-world transform, in the scene's gauge.
+K = np.array([[500., 0., 320.], [0., 500., 180.], [0., 0., 1.]])
+rgb, alpha = renderer.render(pose, K)
+Image.fromarray(rgb).save("render.png")
+```
+
+输出为完整尺寸的 RGB `uint8[H,W,3]` 和 alpha `[H,W]`，不裁剪图像、不提供点云替代渲染。
+相机内参为像素单位，位姿与高斯必须使用一致的坐标系。
+NPZ 包含浮点数组 `means[N,3]`、正尺度 `scales[N,3]`、非零 `quats[N,4]`（wxyz）、
+`colors[N,3]`（RGB，范围 0–1）、`opacities[N]` 或 `[N,1]`（范围 0–1）。
+
+时间透明度通过 `Renderer(..., frame_times=..., temporal_opacity=True)` 启用，
+需要额外的 `source_frames[N]`、正值 `temporal_widths[N]`，调用时传入源帧坐标 `timestamp`。
+归档 SH 场景 checkpoint 的加载和渲染接口也保留。
+
+**当前 `Renderer.render()` 使用推理模式并返回 NumPy，不支持训练反向传播。**
+尚未新增世界模型训练器或可微训练接口。
+
+### 离线整图渲染
+
+从项目根目录运行，对已有高斯和相机产物生成整图 PNG 及视频：
+
+```bash
+python scripts/rendering/render.py \
+  --reconstruction-root /path/to/four_view_scenes \
+  --experiment world_model_render_check \
+  --temporal-opacity --input-metrics --seconds 3 --fps 30 --samples 8
+```
+
+输入根目录包含 `reconstruction_single_{front,back,left,right}/`，每路包含：
+
+- `scene.npz`：高斯参数及可选时间字段。
+- `predictions.npz`：`extrinsics`、`intrinsics`、`depth`、`input_paths`。
+- `selected_indices.json`：共同的递增源帧索引。
+- 默认输入指标还需要 `scene.json`（记录 `horizontal_fov_deg`）、`input_intrinsics.json` 和对应原始输入图像。
+
+`--no-input-metrics` 可仅生成媒体；缺少时间字段时显式使用 `--no-temporal-opacity`。
+四路独立模型坐标不直接融合。视频分辨率由预测深度尺寸确定，四路必须相同。
+输出六段视频（四路、2x2 拼接、前视新视角）及整图 PNG，记录在 `output/<experiment>/`。
+输入一致性指标包括 PSNR、SSIM 和 alpha 覆盖率，不等于留出测试结果。
+已有非空渲染目录拒绝覆盖；不指定实验名称时自动创建时间戳目录并归档输入。
+新实验不再创建停车目录；`reconstruction/` 仅用于兼容已有输入布局和存放渲染输入副本。
+
+归档场景 checkpoint 模式保留，必须显式指定 checkpoint 和完整 SfM 目录：
+
+```bash
+python scripts/rendering/render.py \
+  --checkpoint /path/to/scene_checkpoint.pt --sfm /path/to/sfm \
+  --experiment archived_render_check --seconds 3 --samples 8
+```
+
+## 运行依赖
+
+渲染需要 CUDA、匹配的 PyTorch 和 gsplat，以及 NumPy、SciPy、Pillow。
+离线视频需要系统 `ffmpeg`（libx264）和 `ffprobe`。
+带 FOV 调整的参考图指标需要 OpenCV；归档 SfM 模式额外需要 pycolmap。
+渲染已有 NPZ 不需要 DGGT 网络权重、ROS 或停车模块。
+
+可使用现有 `parkings` 环境，按机器环境配置 CUDA：
 
 ```bash
 conda activate parkings
+export PYTHONNOUSERSITE=1
+python scripts/rendering/render.py --help
 ```
 
-已配置 Python 3.10、PyTorch 2.4.1+cu124、NumPy 1.26.4、gsplat 1.5.3、
-DGGT 依赖、pointops2、ROS bag 读取和视频工具。
-该环境设置 `PYTHONNOUSERSITE=1`、`CUDA_HOME=/usr/local/cuda-12.5`，并清空失效的 `LD_PRELOAD`。
-若此前已激活环境，先退出再重新激活。依赖入口是 `requirements-dggt.txt`。
-
-需要重新安装时，先安装配套 CUDA PyTorch，再安装依赖和扩展：
-
-```bash
-python -m pip install torch==2.4.1 torchvision==0.19.1 torchaudio==2.4.1 \
-  --index-url https://download.pytorch.org/whl/cu124
-python -m pip install -r requirements-dggt.txt
-TORCH_CUDA_ARCH_LIST=8.9 MAX_JOBS=4 python -m pip install \
-  --no-build-isolation --no-deps ./third_party/dggt/third_party/pointops2
-```
-
-## 数据与权重
-
-- DGGT 主权重：`checkpoints/model_latest_waymo.pth`，官方 SHA-256 已核验。
-- [ParkingE2E](https://github.com/qintonguav/ParkingE2E) Demo Bag：`data/raw/parkinge2e/demo_bag.bag`，约 9.02 GB。
-- 标定和来源记录：`data/raw/parkinge2e/calibration/`。
-- 选中候选 14：32.3 秒，包含停止、倒车转弯、停止，四相机各 222 帧。
-- 参考轨迹来自融合定位，不是独立测量的高精度真值；原始数据许可需要遵循作者要求。
-- 旧 Hilti 数据仅保留作历史材料，不用于这次泊车轨迹实验。
-
-## 已完成实验
-
-结果目录：`outputs/parkinge2e_20261010_01/`。
-本地归档：`outputs/parkinge2e_20261010_01_results.zip`，不重复包含原始 bag 和模型权重。
-
-| 材料 | 路径 |
-|---|---|
-| 结果报告 | `EXPERIMENT_REPORT.md` |
-| 浏览入口 | `index.html` |
-| 原始输入与参考轨迹 | `preparation/selected_candidate14/` |
-| 四路真实 DGGT 推理 | `reconstruction_single_{front,back,left,right}/` |
-| 对齐场景与严格风险地图 | `mapping/` |
-| 规划、仿真和比较结果 | `evaluation.json` |
-| 主流程图表、失败证据视频 | `analysis/` |
-| 无障碍控制诊断视频 | `analysis_control/` |
-| 实际高斯渲染视频 | `rendering/gaussian_orbit.mp4` |
-
-**主流程未通过：** 真实重建完成，但严格地图阻塞起终点车身范围，不能生成可执行规划。
-无障碍控制诊断得到成功轨迹，但不代表重建地图可用于安全泊车。
-完整复现实验命令保存在结果目录的 `reproduce.sh`，输出到新的目录，不覆盖本次结果。
-
-## 网页 Demo
-
-```bash
-python -m parking_gs.server --host 127.0.0.1 --port 8080
-```
-
-访问 `http://127.0.0.1:8080`。初始场景是合成 Demo，不是本次真实数据的成功结果。
-网页上传不读取 `configs/site.json`；真实场地需明确尺度、Z 向上、起终点和已知区域。
-车辆位姿使用后轴中心 `[x,y,yaw]`，距离单位米，角度单位弧度。
-
-## 限制
-
-- 已修复原始 NPZ 缺 metadata 的交接问题，以及场景旋转时四元数未同步的问题。
-- 普通视频 CLI 仍只取首个窗口；实验脚本另外保存了覆盖完整片段的采样及多路结果。
-- 本次为离线重建，使用相机高度和水平地面假设定尺度，定位原点与后轴关系未独立核验。
-- 轨迹误差按弧长比较，不是时间 ADE；视频对比是进度归一化，不是真车闭环验证。
+`data/`、`checkpoints/`、`output/` 和 `third_party/` 均未删除；其上游许可及来源记录保持原样。

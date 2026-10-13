@@ -1,8 +1,0 @@
-# Python 3.10-3.12. Install a CUDA-compatible torch build first for training.
-numpy>=1.26,<3
-Pillow>=10.4,<12
-opencv-python>=4.10,<5
-plyfile>=1.1,<2
-torch>=2.4,<3
-gsplat==1.5.3
-pytest>=8,<9

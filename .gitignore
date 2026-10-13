@@ -3,8 +3,10 @@ __pycache__/
 .venv/
 checkpoints/
 release/
-outputs/*
-!outputs/.gitkeep
+data/
+outputs/
+output/*
+!output/.gitkeep
 data/raw/*
 !data/raw/.gitkeep
 data/processed/*
