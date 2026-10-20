@@ -10,8 +10,8 @@ def rank_maneuvers(model,observation,horizon=4,dt=0.4):
     state=model.observe(observation);items=[]
     specs=[('cruise',0.,0.),('slow_down',-2.,0.),('left_arc',0.,.08),('right_arc',0.,-.08)]
     for name,acceleration,rate in specs:
-        action=torch.tensor([acceleration,rate],dtype=torch.float32)[None,None].expand(1,horizon,2)
-        intervals=torch.full((1,horizon),dt)
+        action=torch.tensor([acceleration,rate],dtype=torch.float32,device=state['hidden'].device)[None,None].expand(1,horizon,2)
+        intervals=torch.full((1,horizon),dt,device=state['hidden'].device)
         prediction=model.rollout(state,action,intervals)
         path=trajectory(prediction['ego'])[0]
         tokens=prediction['tokens'][0];mask=prediction['mask_logits'][0].sigmoid()>.5

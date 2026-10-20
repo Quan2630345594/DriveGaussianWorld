@@ -85,8 +85,8 @@ def world_loss(pred,target):
     rgb=F.l1_loss(pred['rgb'],target['rgb'])
     # Spatial slots are sampling rays, not persistent actor identities. Match point sets.
     b,t,k,_=pred['tokens'].shape
-    pp=pred['tokens'][...,:3].reshape(b*t,k,3)
-    gt=target['tokens'][...,:3].reshape(b*t,k,3)
+    pp=pred['tokens'][...,:3].reshape(b*t,k,3).float()
+    gt=target['tokens'][...,:3].reshape(b*t,k,3).float()
     vm=valid.reshape(b*t,k)
     distances=torch.cdist(pp,gt,p=2)
     to_gt=distances.masked_fill(~vm.bool()[:,None,:],10.).min(-1).values
@@ -102,5 +102,5 @@ def world_loss(pred,target):
     mask=F.binary_cross_entropy_with_logits(pred['mask_logits'],valid)
     ego=F.smooth_l1_loss(pred['ego'],target['ego'])
     total=rgb+2*geometry+0.2*attributes+0.05*mask+0.1*ego
-    return total,{'rgb_l1':rgb.item(),'geometry_huber':geometry.item(),'attributes_l1':attributes.item(),
+    return total,{'rgb_l1':rgb.item(),'geometry_distance':geometry.item(),'attributes_l1':attributes.item(),
                   'mask_bce':mask.item(),'ego_huber':ego.item(),'total':total.item()}

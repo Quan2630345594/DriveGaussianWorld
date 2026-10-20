@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 import numpy as np
-from drive_gaussian_world.common import cpu_runtime,write_json,read_json,sha256
+from drive_gaussian_world.common import configure_runtime,move_to,write_json,read_json,sha256
 
 def trajectory(ego):
     import torch
@@ -54,19 +54,20 @@ def scores(pred,target):
             'gaussian_chamfer_m':chamfer,'surface_mask_iou':coverage,
             **{f'psnr_step_{i+1}_db':psnr[:,i].tolist() for i in range(psnr.shape[1])}}
 
-def evaluate(dataset,checkpoint,output,split='test',batch_size=4,threads=2):
-    cpu_runtime(42,threads)
+def evaluate(dataset,checkpoint,output,split='test',batch_size=4,threads=2,device='cuda'):
+    selected=configure_runtime(42,threads,device)
     import torch
     from torch.utils.data import DataLoader
     from drive_gaussian_world.data.windows import DrivingWindows
     from drive_gaussian_world.train import load_model
-    model,ckpt=load_model(checkpoint);cfg=ckpt['config']
+    model,ckpt=load_model(checkpoint,selected);cfg=ckpt['config']
     if sha256(Path(dataset)/'dataset.json')!=ckpt['dataset_sha256']:
         raise ValueError('checkpoint dataset provenance mismatch')
     ds=DrivingWindows(dataset,split,cfg['history'],cfg['horizon'])
     results={name:{} for name in ['learned_logged_motion','learned_current_motion','persistence','action_warp','constant_speed']}
     with torch.inference_mode():
         for batch in DataLoader(ds,batch_size=batch_size,shuffle=False,num_workers=0):
+            batch=move_to(batch,selected)
             actions=batch['condition']['actions'];dt=batch['condition']['dt']
             used=torch.zeros_like(actions) if cfg['no_actions'] else actions
             state=model.observe(batch['observation'])
@@ -82,7 +83,7 @@ def evaluate(dataset,checkpoint,output,split='test',batch_size=4,threads=2):
             for name,pred in predictions.items():
                 for key,value in scores(pred,batch['target']).items():results[name].setdefault(key,[]).extend(value)
     summary={name:{k:float(np.mean(v)) for k,v in values.items()} for name,values in results.items()}
-    report={'schema_version':1,'split':split,'windows':len(ds),'scene_ids':[e['scene_id'] for e,a in ds.episodes],
+    report={'schema_version':1,'device':str(selected),'split':split,'windows':len(ds),'scene_ids':[e['scene_id'] for e,a in ds.episodes],
         'metrics':summary,'checkpoint_sha256':sha256(checkpoint),'dataset_sha256':ckpt['dataset_sha256'],
         'ablation':{'no_geometry':cfg['no_geometry'],'no_actions':cfg['no_actions']},
         'conditioning':{'learned_logged_motion':'Future motion-derived labels supplied as scenario; conditional prediction, not autonomous forecasting.',
@@ -98,6 +99,6 @@ def evaluate(dataset,checkpoint,output,split='test',batch_size=4,threads=2):
 def main():
     p=argparse.ArgumentParser();p.add_argument('--dataset',required=True);p.add_argument('--checkpoint',required=True)
     p.add_argument('--output',required=True);p.add_argument('--split',choices=['train','val','test'],default='test')
-    p.add_argument('--batch-size',type=int,default=4);p.add_argument('--threads',type=int,default=2)
+    p.add_argument('--device',default='cuda');p.add_argument('--batch-size',type=int,default=4);p.add_argument('--threads',type=int,default=2)
     print(evaluate(**vars(p.parse_args())))
 if __name__=='__main__':main()

@@ -9,12 +9,12 @@ import urllib.error
 from drive_gaussian_world.train import train
 
 def test_cpu_api_contract_and_request_limits(dataset,tmp_path):
-    checkpoint=train(dataset,tmp_path/'api_train',steps=1,batch_size=2,hidden=32)
+    checkpoint=train(dataset,tmp_path/'api_train',steps=1,batch_size=2,hidden=32,device='cpu')
     with socket.socket() as s:
         s.bind(('127.0.0.1',0));port=s.getsockname()[1]
     log=(tmp_path/'server.log').open('w')
     process=subprocess.Popen([sys.executable,'-m','drive_gaussian_world','serve','--dataset',str(dataset),
-        '--checkpoint',checkpoint,'--port',str(port)],stdout=log,stderr=log,env=os.environ.copy())
+        '--checkpoint',checkpoint,'--device','cpu','--port',str(port)],stdout=log,stderr=log,env=os.environ.copy())
     url=f'http://127.0.0.1:{port}'
     try:
         for _ in range(60):

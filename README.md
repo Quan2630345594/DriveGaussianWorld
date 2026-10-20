@@ -1,156 +1,230 @@
+<div align="center">
+
 # DriveGaussianWorld
 
-**面向行车场景的因果 Gaussian 世界模型工程。** 以官方 DGGT 预训练模型提取历史几何状态，训练轻量动作条件时序模型，预测未来低分辨率 RGB、Gaussian 表面与自车运动；提供真实数据采集、来源审计、CPU 训练、基线、消融、离线动作比较和推理 API。
+### Geometry Grounded World Modeling for Autonomous Driving
 
-项目服务于世界模型/智驾实习中的工程能力展示。当前验收范围是 **真实行车小样本 + 原生 DGGT CPU 推理 + 轻量世界模型训练与离线评估**。不把数据适配器称为模型，不把合成泊车轨迹作为行车结果，也不把开环动作排序称为车辆闭环控制。
+[![Tests](https://github.com/Quan2630345594/GaussianParkWorld/actions/workflows/tests.yml/badge.svg)](https://github.com/Quan2630345594/GaussianParkWorld/actions/workflows/tests.yml)
+![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
+![PyTorch](https://img.shields.io/badge/PyTorch-2.4-orange)
+![CUDA](https://img.shields.io/badge/CUDA-supported-76B900)
 
-## 主流程
+**DGGT 几何前端 · 动作条件潜空间动力学 · Gaussian 场景预测**
+
+[技术概览](#技术概览) • [安装](#安装) • [数据准备](#数据准备) • [训练与评估](#训练与评估) • [技术文档](#技术文档) • [引用](#引用)
+
+</div>
+
+DriveGaussianWorld 将预训练 DGGT 的几何重建能力与动作条件时序建模连接起来，面向道路行车序列预测未来图像、局部 Gaussian 场景和自车运动。项目包含数据采集与审计、因果表征缓存、模型训练、基线与消融、可视化报告和推理 API。
+
+## 项目特性
+
+- **原生 DGGT 前端**：冻结上游模型，预测相机参数、深度、Gaussian 属性和动态概率，输出统一的几何状态。
+- **因果观测缓存**：每个时刻只重建已观测历史，避免完整视频重建引入未来信息。
+- **动作条件世界模型**：融合图像、Gaussian 集合和速度，以递归潜状态建模未来演化。
+- **几何运动先验**：结合解析自车运动和学习残差，联合预测场景、观测与自车位移。
+- **完整实验接口**：支持 CUDA、GPU 索引、FP16/BF16 训练，提供基线、消融、日志与检查点。
+
+## 技术概览
 
 ```mermaid
 flowchart LR
-    A[KITTI 行车双目/OXTS/标定] --> B[校验采集与日志级划分]
-    B --> C[历史图像 → 原生 DGGT]
-    B --> S[历史双目 → CPU 深度尺度参考]
-    C --> G[因果 Gaussian 状态缓存]
-    S --> G
-    G --> E[图像编码器 + Gaussian 集合编码器]
-    E --> W[动作条件 GRU 世界模型]
-    U[独立提供的运动条件] --> W
-    W --> F[开环未来 RGB/Gaussian/自车位移]
-    F --> V[留出评估/基线/消融/交互报告]
-    F --> P[离线候选动作比较/API]
+    A[历史行车图像] --> B[DGGT 几何前端]
+    S[同步双目与标定] --> M[历史尺度锚定]
+    B --> M
+    M --> G[Gaussian 状态与有效采样 Mask]
+    A --> E[图像编码器]
+    G --> Q[Gaussian 集合编码器]
+    E --> H[历史 GRU 潜状态]
+    Q --> H
+    V[历史自车速度] --> H
+    H --> D[动作条件 GRU 动力学]
+    U[动作条件与时间间隔] --> D
+    D --> P[解析运动先验与学习残差]
+    P --> I[未来 RGB]
+    P --> F[未来 Gaussian 场景]
+    P --> T[未来自车运动]
 ```
 
-- **几何前端**：直接加载 `third_party/dggt` 的 `VGGT` 与已有 Waymo 权重，严格匹配参数，使用上游正式推理中的深度反投影路径。没有用随机网络替代 DGGT。
-- **因果缓存**：时刻 `t` 最多使用 `[t-1,t]` 的历史采样图像，每个时刻重新前向；不会用全日志重建结果切片，防止 DGGT 时间注意力泄露未来帧。
-- **米制参考**：当前时刻双目 SGBM 深度为 DGGT 提供中位数尺度锚点。仍保留预测相机内参/位姿和尺度误差，不宣称 DGGT 单目输出天然具有米制精度。
-- **世界模型**：CNN 图像编码 + masked DeepSets Gaussian 编码 + 历史 GRU + 动作条件 GRU。预测相机局部 Gaussian 状态、残差 RGB 和自车运动；多步 rollout 不读取未来图像或未来几何。
-- **监督与评估**：RGB、自车运动、Gaussian 集合距离、有效采样 mask、属性和四元数监督；比较末帧保持、解析刚体运动、RGB-only、无动作输入及 stereo 表征。
+### DGGT 几何前端
 
-## 服务器上直接运行
+前端直接使用 [xiaomi-research/dggt](https://github.com/xiaomi-research/dggt) 的 `VGGT` 模型。图像经过 patch embedding 和帧内/跨帧交替注意力，多个预测头联合输出相机位姿编码、深度、Gaussian 外观与几何属性以及动态概率。本项目沿用上游 `use_depth=True` 推理路径，由预测深度和相机内外参反投影得到场景点，而不是直接使用 point head 作为最终几何。
 
-项目目录：`/home/tiger/Disk/DriveGaussianWorld`。现有环境：
+对时刻 `t`，缓存只接收 `[t-C+1, …, t]` 的历史帧；每次在当前预测相机系中提取状态，借助当时的双目深度估计尺度。每帧在 **4×16 网格**上选取 **64 个 Gaussian 槽位**，每个槽位为 16 维向量：位置、RGB、不透明度、三轴尺度、四元数、动态概率与置信度。网格槽位是采样位置，不代表持续追踪的物体身份。
 
-```bash
-cd /home/tiger/Disk/DriveGaussianWorld
-export DGW_PYTHON=/home/tiger/ProgramFiles/miniconda3/envs/parkings/bin/python
-export CUDA_VISIBLE_DEVICES='' PYTHONNOUSERSITE=1
-export OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=2 MKL_NUM_THREADS=2
-$DGW_PYTHON -m drive_gaussian_world doctor
-make test PYTHON="$DGW_PYTHON"
+尺度锚定为中位数深度比例，并非完整的相机—车体配准；状态仍保留前端预测误差。相机坐标采用 **右、下、前**，位置与尺度分别按 40 m、5 m 归一化。
+
+### Gaussian 世界模型
+
+世界模型由三部分组成：
+
+1. **观测编码**：CNN 将 `3×32×96` RGB 编码为 64 维向量；共享 MLP 与 masked mean 将 `64×16` Gaussian 集合编码为 48 维向量，再与速度拼接输入历史 GRU。
+2. **动作条件递推**：动力学 GRU 每步接收 `[a/5, yaw_rate, dt, speed/20]`，递归更新潜状态。解析平面运动将上一时刻 Gaussian 变换到下一相机局部系，网络预测几何、属性、有效采样 mask 和自车运动残差。
+3. **联合解码**：图像残差解码器预测未来 RGB；Gaussian 解码器预测局部场景；自车解码器预测 `[forward, left, delta_yaw]`。开环 rollout 不读取未来观测，也不使用 teacher forcing。
+
+训练目标为：
+
+```text
+L = L_rgb + 2 L_geometry + 0.2 L_attributes + 0.05 L_mask + 0.1 L_ego
 ```
 
-已有完整产物的入口与实测结果见 [`docs/RESULTS.md`](docs/RESULTS.md)。这份文件在实际实验结束后生成，不能从示例命令推定训练结果。
+其中几何项使用双向最近邻集合距离，属性项包含固定采样槽属性误差与四元数符号不变项；检查点仅由验证集损失选择。默认历史 3 帧、预测 4 步，潜状态维度与预测长度可配置；当前图像解码分辨率和 Gaussian 槽位数固定。
 
-从零复现整套 CPU 流程（使用新的 run 目录，避免覆盖证据）：
+## 技术文档
+
+| 模块 | 文档 | 内容 |
+|---|---|---|
+| DGGT 前端 | [DGGT 前端技术设计](docs/DGGT_Frontend.docx) | 原生网络结构、深度反投影、坐标转换、因果缓存、尺度锚定与状态契约 |
+| 世界模型 | [Gaussian 世界模型技术设计](docs/World_Model.docx) | 编码器、递归动力学、运动先验、解码器、损失函数、GPU 执行与评估协议 |
+
+## 安装
+
+### 1 创建环境
 
 ```bash
-DGW_PYTHON="$DGW_PYTHON" bash scripts/cpu_pipeline.sh runs/my_cpu_run
+git clone --recurse-submodules https://github.com/Quan2630345594/GaussianParkWorld.git DriveGaussianWorld
+cd DriveGaussianWorld
+conda create -n drivegaussianworld python=3.10 -y
+conda activate drivegaussianworld
+
+# PyTorch 2.4.1 CUDA 12.4 示例；请按驱动选择对应的官方 CUDA wheel。
+pip install torch==2.4.1 torchvision==0.19.1 --index-url https://download.pytorch.org/whl/cu124
+pip install -e '.[test,dggt]'
 ```
 
-分阶段执行：
+### 2 准备 DGGT 运行时
 
 ```bash
-# 1. 仅选取官方公开 S3 ZIP 内的所需成员；SHA256 + CRC32；支持复用已校验成员。
-$DGW_PYTHON -m drive_gaussian_world collect --root data/kitti --frames 128 --stride 4
-
-# 2. 双目几何参考、同步检查、OXTS 标签与数据契约。
-$DGW_PYTHON -m drive_gaussian_world prepare --output data/processed/my_stereo
-$DGW_PYTHON -m drive_gaussian_world validate --dataset data/processed/my_stereo
-
-# 3. 真正的 DGGT CPU 前向。140 像素输入宽度只用于受限资源工程实验。
-$DGW_PYTHON -m drive_gaussian_world dggt-cache \
-  --dataset data/processed/my_stereo --output data/processed/my_dggt \
-  --width 140 --context 2 --threads 2
-
-# 4. 原始文件完整性与独立 LiDAR 稀疏深度诊断。
-$DGW_PYTHON -m drive_gaussian_world audit \
-  --dataset data/processed/my_dggt --output runs/my_audit.json
-
-# 5. 主模型、RGB-only、无动作、stereo 对照；全部 CPU。
-$DGW_PYTHON -m drive_gaussian_world experiments \
-  --dataset data/processed/my_dggt --stereo-dataset data/processed/my_stereo \
-  --config configs/cpu_smoke.json --output runs/my_experiments
-
-# 6. 自包含 HTML、GIF、数值指标和反事实动作比较。
-$DGW_PYTHON -m drive_gaussian_world demo \
-  --dataset data/processed/my_dggt \
-  --checkpoint runs/my_experiments/dggt_world/best.pt --output runs/my_demo
+# 非 Git 源码包可使用该脚本获取固定版本的上游源码。
+bash scripts/setup_dggt_source.sh
+pip install -r third_party/dggt/requirements.txt
+mkdir -p checkpoints
+curl -L --fail \
+  https://huggingface.co/xiaomi-research/dggt/resolve/main/model_latest_waymo.pt \
+  -o checkpoints/model_latest_waymo.pth
+python -m drive_gaussian_world doctor
 ```
 
-命令拒绝覆盖已有数据集/实验目录。失败产物保留以便定位问题；重新运行时换一个输出路径。采集器只读复用通过 CRC 的原始成员，可以重复执行。整包下载器 `data.collect` 是可选工具，默认 CLI 使用 `data.range_collect`，不需要下载数 GB 的完整日志。
+前端缓存不调用扩散精修或跟踪模块；如单独运行上游完整训练/渲染，请另外遵循其安装说明。依赖冲突时，以 PyTorch、torchvision 和 CUDA 版本匹配为先，避免混装多个 torch 版本。
 
-## 数据集与语义
+## 数据准备
 
-| split | KITTI raw 日志 | 选取帧 | 平均前向速度 |
-|---|---|---:|---:|
-| train | `2011_09_26_drive_0005_sync` | 32 | 4.17 m/s |
-| val | `2011_09_26_drive_0013_sync` | 32 | 11.42 m/s |
-| test | `2011_09_26_drive_0009_sync` | 32 | 10.85 m/s |
-
-每个日志取原始帧 `0,4,...,124`，约 12.8 秒，采样间隔约 0.41 秒。采集左右相机、对应 OXTS、时间戳和标定，额外各取 3 帧真实 LiDAR 作诊断。划分单位是整条日志，附近路线仍可能地理重叠；这不是正式基准划分。
-
-曾检查的 `0018` 初始区间几乎静止，已从主数据集排除，记录见 `docs/data_selection.json`。历史泊车数据、旧输出和归档数据不参与新训练入口。
-
-**动作不是实车控制标签。** 当前条件为由相邻 OXTS 速度/航向变化计算的 `[acceleration_m_s2, yaw_rate_rad_s]`；它们是实现动作条件建模的运动代理，不能称为实测油门、制动或方向盘命令。评估明确区分：
-
-1. `learned_logged_motion`：提供未来日志运动作为条件，评估条件预测。
-2. `learned_current_motion`：只用历史观测，未来条件为匀速直行，不提供未来运动标签。
-3. `persistence` / `action_warp`：末帧图像及解析刚体运动基线；自车基线使用同样日志运动条件。
-
-RGB 为 `[3,32,96]`；Gaussian 为 `[64,16]`。坐标为相机光学系：右、下、前。字段、归一化单位、mask 和时间契约见 `data/schema.py` 与 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)。Gaussian 是稀疏可见表面/伪标签，不是占据、车道或可通行区真值。
-
-## 推理 API
-
-默认只监听服务器 loopback，不自动对公网开放：
+当前提供 KITTI raw 适配：同步双目、OXTS、时间戳和标定进入主流程，少量 LiDAR 用于独立深度诊断。示例划分按整条日志隔离：`0005 / 0013 / 0009` 分别用于 train / val / test。
 
 ```bash
-$DGW_PYTHON -m drive_gaussian_world serve \
+# 选择公开 ZIP 中所需成员，校验 CRC32 和 SHA256。
+python -m drive_gaussian_world collect --root data/kitti --frames 128 --stride 4
+
+# 构建同步序列、运动条件与双目参考几何。
+python -m drive_gaussian_world prepare \
+  --raw data/kitti/raw --output data/processed/kitti_stereo
+
+# 在 GPU 上构建因果 DGGT 缓存；默认宽度 518，最多 4 帧历史。
+python -m drive_gaussian_world dggt-cache \
+  --dataset data/processed/kitti_stereo --raw data/kitti/raw \
+  --output data/processed/kitti_dggt \
+  --device cuda:0 --width 518 --context 4 --precision fp32
+
+python -m drive_gaussian_world validate --dataset data/processed/kitti_dggt
+python -m drive_gaussian_world audit \
+  --dataset data/processed/kitti_dggt --output runs/data_audit.json
+```
+
+输出目录须为新目录，防止覆盖已有实验。初始采集配置是工程示例；扩大数据时需调整日志清单、时间区间及划分，并重新生成对应缓存。数据来源、许可和划分限制见 [数据卡](docs/DATA_CARD.md)。
+
+## 训练与评估
+
+### 训练世界模型
+
+```bash
+python -m drive_gaussian_world train \
+  --dataset data/processed/kitti_dggt --output runs/world_model \
+  --device cuda:0 --precision fp16 \
+  --steps 20000 --batch-size 32 --history 3 --horizon 4 --hidden 96
+```
+
+默认设备为 `cuda`；可指定 `cuda:N`，或使用 `--device auto` 自动选择设备。没有可用 CUDA 时，默认路径明确报错；本地调试可显式传入 `--device cpu --precision fp32`。FP16 使用梯度缩放，BF16 需硬件支持；显存占用取决于 DGGT 分辨率、历史长度和训练批大小。
+
+### 评估与消融
+
+```bash
+python -m drive_gaussian_world evaluate \
+  --dataset data/processed/kitti_dggt --checkpoint runs/world_model/best.pt \
+  --device cuda:0 --split test --output runs/world_model/test.json
+
+python -m drive_gaussian_world experiments \
   --dataset data/processed/kitti_dggt \
-  --checkpoint runs/driving_cpu/dggt_world/best.pt --port 8765
+  --stereo-dataset data/processed/kitti_stereo \
+  --config configs/default.json --output runs/ablations
+```
 
+实验包括完整模型、RGB-only、移除动作条件及 stereo 表征对照；基线包括末帧保持、解析刚体运动和匀速运动。输出 RGB L1/PSNR、自车 ADE/FDE、Gaussian 集合距离和有效采样 mask IoU。
+
+**条件协议**：当前动作是由 OXTS 差分得到的 `[acceleration, yaw_rate]` 运动代理，不是实测油门/方向盘命令。`learned_logged_motion` 提供未来日志运动作为条件；`learned_current_motion` 不提供未来运动标签。Gaussian 指标主要针对前端伪标签，不能替代独立真实几何评估。已有小样本参考结果见 [实验记录](docs/RESULTS.md)，并非 GPU 大规模训练结果或基准性能承诺。
+
+### 可视化与推理服务
+
+```bash
+python -m drive_gaussian_world demo \
+  --dataset data/processed/kitti_dggt --checkpoint runs/world_model/best.pt \
+  --device cuda:0 --output runs/demo
+
+python -m drive_gaussian_world serve \
+  --dataset data/processed/kitti_dggt --checkpoint runs/world_model/best.pt \
+  --device cuda:0 --port 8765
+```
+
+报告包含历史观测、未来图像、Gaussian 表面、自车轨迹和基线对比。API 默认绑定 `127.0.0.1`：
+
+```bash
 curl http://127.0.0.1:8765/health
 curl -X POST http://127.0.0.1:8765/api/rollout \
   -H 'Content-Type: application/json' \
   -d '{"window":0,"dt":0.4,"actions":[[0,0],[0,0],[0,0],[0,0]]}'
 ```
 
-返回预测图像、Gaussian、自车位移及来源 anchor，不返回真值未来。API 限制请求长度、动作范围和预测长度，并串行执行模型推理。离线动作比较仅提供研究排序，未连接执行器，没有真实碰撞几何或干预数据支撑安全性结论。
+动作长度应与检查点的预测 horizon 一致。离线候选动作比较仅用于研究，当前没有真实车辆执行器或闭环碰撞验证。
 
-## 工程结构
+## 项目结构
 
 ```text
-drive_gaussian_world/
-  data/          官方样本采集、来源审计、时间/坐标转换、数据契约、时序窗口
-  geometry/      CPU stereo 参考、原生 DGGT 因果缓存
-  models/        图像/集合编码、动作条件递归动力学、Gaussian/RGB/ego 解码与损失
-  planning/      候选动作的开环比较
-  train.py       有预算的 CPU 训练、梯度裁剪、val 选择 checkpoint、来源记录
-  evaluate.py    日志条件/无未来条件评估、解析基线
-  demo.py        真实留出样例 HTML/GIF/JSON
-  serve.py       本地 CPU JSON 推理 API
-  experiments.py 配置驱动的主实验和消融
-configs/         可执行的 CPU 实验配置
-scripts/         全流程复现脚本
-tests/           数据契约、泄漏、动作、尺度、checkpoint、报告、采集完整性测试
-docs/            架构、数据卡、模型卡、实测结果、面试叙述和资源扩展计划
-legacy/parking/  迁移前源代码、测试和 README 的归档，不是默认实验入口
-third_party/     原有 DGGT/splatt3r checkout 与许可证，未修改其模型实现
+DriveGaussianWorld/
+├── configs/                 # 训练与回归配置
+├── docs/                    # 两份核心技术 DOCX、数据卡与实验记录
+├── drive_gaussian_world/
+│   ├── data/                # 采集、同步、契约、窗口与来源审计
+│   ├── geometry/            # DGGT 适配与双目尺度参考
+│   ├── models/              # 多模态编码、递归动力学、解码与损失
+│   ├── planning/            # 离线候选动作比较
+│   ├── train.py             # 训练、混合精度与检查点
+│   ├── evaluate.py          # 条件评估与解析基线
+│   ├── demo.py              # 可视化报告
+│   └── serve.py             # 推理 API
+├── scripts/                 # 上游源码准备与完整流水线
+├── tests/                   # 契约、因果性、设备路由与集成测试
+└── third_party/dggt/        # 固定版本上游模型
 ```
 
-新机器可用 Python 3.10 + PyTorch 2.4.1 CPU 环境安装 `pip install -e '.[test]'` 跑核心测试。DGGT 是单独的可选上游运行时，需初始化原有 submodule（源码包可执行 `bash scripts/setup_dggt_source.sh`）并按 `third_party/dggt/README.md` 准备依赖与权重。`.[dggt]` 仅安装适配器常见依赖，不替代上游完整环境。当前服务器已用既有环境验证，环境清单保存在 `docs/environment.txt`；没有升级系统环境或编译 CUDA 扩展。
+## 开发与测试
 
-## 项目边界与后续资源
+```bash
+make test
+make pipeline DEVICE=cuda CONFIG=configs/default.json
+```
 
-当前是经过实际验证的 **CPU 工程原型**，不承诺高保真视频生成、长时预测、泛化提升或真实闭环规划。DGGT 使用降低的输入分辨率，世界模型规模与数据量都很小；基线优于学习模型时，照实保留结果。
+测试使用小型 fixture 验证数据与数值契约，不启动完整训练。提交改动时请覆盖坐标、时间或设备相关的回归检查，记录数据与模型来源，并保持训练目标和推理输入之间的因果边界。
 
-拿到计算资源后，按 [`docs/RESOURCE_PLAN.md`](docs/RESOURCE_PLAN.md) 扩到原生分辨率 DGGT、nuScenes/Waymo/Argoverse2、随机潜变量与不确定性、独立几何评估和仿真闭环。当前入口没有 GPU 自动选择，也不启动 GPU 训练。
+## 引用
 
-归档与迁移说明见 [`docs/MIGRATION.md`](docs/MIGRATION.md)。已有未提交内容在迁移前完整备份，未自动提交、推送或覆盖远端仓库名称。
+本项目基于 [DGGT 官方实现](https://github.com/xiaomi-research/dggt) 和 [KITTI raw 数据](https://www.cvlibs.net/datasets/kitti/raw_data.php)。DGGT 及 VGGT 派生文件保留上游许可证与 NOTICE；KITTI 数据遵循 CC BY-NC-SA 3.0，使用和分享数据及派生产物时需遵守其条款。
 
-## 来源与许可
+```bibtex
+@article{geiger2013vision,
+  title={Vision meets Robotics: The KITTI Dataset},
+  author={Geiger, Andreas and Lenz, Philip and Stiller, Christoph and Urtasun, Raquel},
+  journal={The International Journal of Robotics Research},
+  year={2013}
+}
+```
 
-- DGGT：[官方源码](https://github.com/xiaomi-research/dggt)，Apache 2.0，部分 VGGT 来源文件另见其 `NOTICE`。模型保留上游署名与许可证。
-- KITTI：[官方网站与许可](https://www.cvlibs.net/datasets/kitti/)，CC BY-NC-SA 3.0；仅用于符合许可的研究/非商业用途。数据和可识别的派生产物不纳入默认源代码打包。
-- KITTI raw 引用：Geiger et al., *Vision meets Robotics: The KITTI Dataset*, IJRR 2013。
-- 新增代码的对外发布许可尚由项目所有者决定；不改变原有文件及第三方的许可归属。
+DGGT 论文与推荐引用格式请参阅上游仓库。

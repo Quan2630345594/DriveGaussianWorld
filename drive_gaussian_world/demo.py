@@ -8,24 +8,24 @@ import json
 from pathlib import Path
 import numpy as np
 from PIL import Image,ImageDraw
-from drive_gaussian_world.common import cpu_runtime,fresh_dir,write_json,read_json
+from drive_gaussian_world.common import configure_runtime,move_to,to_cpu,fresh_dir,write_json,read_json
 
 def png_data(rgb):
     image=Image.fromarray(np.uint8(np.clip(rgb.transpose(1,2,0),0,1)*255))
     b=io.BytesIO();image.save(b,format='PNG')
     return 'data:image/png;base64,'+base64.b64encode(b.getvalue()).decode()
 
-def make_demo(dataset,checkpoint,output,split='test',window=0):
-    cpu_runtime()
+def make_demo(dataset,checkpoint,output,split='test',window=0,device='cuda'):
+    selected=configure_runtime(device=device)
     import torch
     from torch.utils.data import default_collate
     from drive_gaussian_world.data.windows import DrivingWindows
     from drive_gaussian_world.train import load_model
     from drive_gaussian_world.evaluate import baseline,trajectory,evaluate
     from drive_gaussian_world.planning.counterfactual import rank_maneuvers
-    out=fresh_dir(output);model,ckpt=load_model(checkpoint);cfg=ckpt['config']
+    out=fresh_dir(output);model,ckpt=load_model(checkpoint,selected);cfg=ckpt['config']
     ds=DrivingWindows(dataset,split,cfg['history'],cfg['horizon'])
-    batch=default_collate([ds[window]])
+    batch=move_to(default_collate([ds[window]]),selected)
     with torch.inference_mode():
         action=batch['condition']['actions']
         if cfg['no_actions']:action=torch.zeros_like(action)
@@ -33,7 +33,8 @@ def make_demo(dataset,checkpoint,output,split='test',window=0):
         ref=baseline(batch)
     counterfactual=rank_maneuvers(model,batch['observation'],cfg['horizon'],float(batch['condition']['dt'][0,0]))
     write_json(out/'counterfactuals.json',counterfactual)
-    metrics=evaluate(dataset,checkpoint,out/'evaluation.json',split)
+    metrics=evaluate(dataset,checkpoint,out/'evaluation.json',split,device=selected)
+    batch=to_cpu(batch);pred=to_cpu(pred);ref=to_cpu(ref)
     target=batch['target'];frames=[];payload=[]
     for i in range(cfg['horizon']):
         row=Image.new('RGB',(960,145),(15,23,38));draw=ImageDraw.Draw(row)
@@ -58,10 +59,10 @@ def make_demo(dataset,checkpoint,output,split='test',window=0):
              'predicted_path':trajectory(pred['ego'])[0].tolist(),'reference_path':trajectory(target['ego'])[0].tolist()}
     write_json(out/'demo_data.json',content)
     template='''<!doctype html><html lang="zh"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>DriveGaussianWorld · CPU experiment</title><style>
+<title>DriveGaussianWorld · World Model</title><style>
 body{font:15px system-ui;background:#0c1423;color:#dbe5f5;max-width:1250px;margin:36px auto;padding:0 20px}h1{font-size:32px}h2{font-size:21px;color:#7dd3fc}p{line-height:1.7}.badge{padding:6px 12px;background:#123a46;border-radius:16px;color:#6ee7b7}section{background:#152137;border:1px solid #27364e;border-radius:14px;padding:20px;margin:20px 0}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}img{width:100%;image-rendering:auto;border-radius:8px}canvas{max-width:100%;background:#0c1423;border-radius:8px}.history{display:flex;gap:12px}.history img{width:30%}table{border-collapse:collapse;width:100%;font-size:13px}td,th{padding:9px;text-align:left;border-bottom:1px solid #30405b}.warn{color:#fcd34d}input{width:60%}@media(max-width:700px){.grid{grid-template-columns:1fr}body{margin-top:16px}table{font-size:10px}}
 </style><h1>DriveGaussianWorld</h1><span class="badge">DGGT → Gaussian state → action-conditioned dynamics</span>
-<p>面向行车场景的 CPU 工程实验。这里展示真实留出日志的实际预测；图像分辨率为 96×32，DGGT 使用降分辨率 CPU 推理。小样本结果用于验证系统，不能代表标准基准表现。</p>
+<p>面向行车场景的 Gaussian 世界模型。报告展示留出序列的历史观测、开环预测、几何状态和基线评估；实际数据规模、分辨率与设备以实验元数据为准。</p>
 <section><h2>历史观测</h2><p id="scene"></p><div class="history" id="history"></div></section>
 <section><h2>开环未来预测</h2><p>这里的模型预测使用日志中的未来运动条件；真值未来仅用于评估。另有不提供未来运动的指标。</p><input id="step" type="range" min="0" value="0"><span id="label"></span>
 <div class="grid"><div><p>真值未来图像</p><img id="gt"></div><div><p>世界模型预测</p><img id="prediction"></div><div><p>保持末帧基线</p><img id="persistence"></div></div></section>
@@ -76,6 +77,6 @@ let cols=['rgb_l1','psnr_db','ego_ade_m','ego_fde_m','gaussian_chamfer_m'];docum
 
 def main():
     p=argparse.ArgumentParser();p.add_argument('--dataset',required=True);p.add_argument('--checkpoint',required=True)
-    p.add_argument('--output',required=True);p.add_argument('--split',default='test');p.add_argument('--window',type=int,default=0)
+    p.add_argument('--device',default='cuda');p.add_argument('--output',required=True);p.add_argument('--split',default='test');p.add_argument('--window',type=int,default=0)
     print(make_demo(**vars(p.parse_args())))
 if __name__=='__main__':main()

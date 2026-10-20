@@ -1,18 +1,11 @@
-# 外部模型 submodule
+# Third Party Dependencies
 
-GaussianParkWorld 保留 `third_party/dggt` 和 `third_party/splatt3r` 上游源码作为历史依赖。
-源码由 `.gitmodules` 固定，模型权重、数据集和 CUDA 环境外置。
-当前第一方代码仅提供渲染接口，渲染已有 NPZ 不需要运行这些模型。
+## DGGT
 
-~~~powershell
-git clone --recurse-submodules https://github.com/Quan2630345594/GaussianPark3DGS.git GaussianParkWorld
-~~~
+- Source: https://github.com/xiaomi-research/dggt
+- Pinned commit: a3276d2bbe4cbb03bcc117830b1836110a27adeb
+- Runtime integration: `drive_gaussian_world/geometry/dggt.py`
 
-已有检出执行：
+The upstream source and model retain their original LICENSE and NOTICE. Some files are derived from VGGT and retain the corresponding upstream terms. The frontend uses the native depth reconstruction path; tracking and diffusion refinement are not invoked by the cache adapter.
 
-~~~powershell
-git submodule update --init --recursive
-~~~
-
-远端仓库暂时仍使用原名称，本地检出目录使用 `GaussianParkWorld`。
-旧 DGGT 重建 CLI 已移除；第三方源码和其许可证未改动。
+Initialize the Git submodule or use `scripts/setup_dggt_source.sh` when working from a source archive. Installation commands and pretrained checkpoint instructions are maintained in the project README.

@@ -1,7 +1,7 @@
-name: CPU contracts and world-model integration
+name: Tests
 on: [push, pull_request]
 jobs:
-  cpu:
+  contracts:
     runs-on: ubuntu-latest
     env:
       CUDA_VISIBLE_DEVICES: ''

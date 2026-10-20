@@ -56,13 +56,13 @@ def test_train_checkpoint_eval_and_demo(dataset,tmp_path):
     from drive_gaussian_world.train import train,load_model
     from drive_gaussian_world.evaluate import evaluate
     from drive_gaussian_world.demo import make_demo
-    checkpoint=train(dataset,tmp_path/'run',steps=2,batch_size=2,hidden=32)
-    model,state=load_model(checkpoint)
+    checkpoint=train(dataset,tmp_path/'run',steps=2,batch_size=2,hidden=32,device='cpu')
+    model,state=load_model(checkpoint,device='cpu')
     assert state['selection_split']=='val'
-    report=evaluate(dataset,checkpoint,tmp_path/'eval.json')
+    report=evaluate(dataset,checkpoint,tmp_path/'eval.json',device='cpu')
     assert report['split']=='test';assert report['windows']==4
     assert report['metrics']['persistence']['rgb_l1']==0
-    path=make_demo(dataset,checkpoint,tmp_path/'demo')
+    path=make_demo(dataset,checkpoint,tmp_path/'demo',device='cpu')
     assert '__DATA__' not in open(path).read()
     assert (tmp_path/'demo'/'rollout.gif').exists()
 

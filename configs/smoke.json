@@ -1,0 +1,8 @@
+{
+  "device": "cpu",
+  "precision": "fp32",
+  "threads": 2,
+  "seed": 42,
+  "model": {"history": 3, "horizon": 4, "hidden": 96},
+  "training": {"steps": 2, "batch_size": 2, "lr": 0.0003}
+}

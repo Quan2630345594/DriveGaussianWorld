@@ -1,4 +1,4 @@
-"""Native DGGT checkpoint inference, isolated from training and explicit CPU only.
+"""Native DGGT checkpoint inference, with causal histories and configurable GPU inference.
 
 Each observation is independently reconstructed from at most the preceding C
 frames. Never reconstruct a whole log and slice it into predictive examples:
@@ -13,7 +13,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 from scipy.spatial.transform import Rotation
-from drive_gaussian_world.common import cpu_runtime,fresh_dir,read_json,write_json,sha256
+from drive_gaussian_world.common import configure_runtime,precision_context,fresh_dir,read_json,write_json,sha256
 from drive_gaussian_world.geometry.stereo import grid_pixels
 from drive_gaussian_world.data.schema import validate_dataset
 
@@ -53,8 +53,10 @@ def prediction_tokens(pred,extri,reference,reference_mask):
                        'metric_status':'stereo_median_scale_only; not full extrinsic registration'}
 
 class NativeDGGT:
-    def __init__(self,upstream,checkpoint,width=140,threads=2):
-        cpu_runtime(42,threads)
+    def __init__(self,upstream,checkpoint,width=518,threads=2,device='cuda',precision='fp32'):
+        self.device=configure_runtime(42,threads,device)
+        self.precision=precision
+        precision_context(self.device,precision)
         import torch
         if width%14 or not 98<=width<=518:raise ValueError('width must be a multiple of 14 in [98,518]')
         self.width=width;self.torch=torch
@@ -70,7 +72,7 @@ class NativeDGGT:
             self.model=VGGT()
         state=torch.load(checkpoint,map_location='cpu',mmap=True,weights_only=True)
         self.model.load_state_dict(state,strict=True,assign=True)
-        self.model=self.model.eval()
+        self.model=self.model.to(self.device).eval()
         self.model.requires_grad_(False)
     def __call__(self,paths):
         torch=self.torch;images=[]
@@ -79,23 +81,23 @@ class NativeDGGT:
             nh=round(h*self.width/w/14)*14
             img=img.resize((self.width,nh),Image.Resampling.BICUBIC)
             images.append(np.asarray(img).copy().transpose(2,0,1)/255.)
-        x=torch.tensor(np.stack(images),dtype=torch.float32,device='cpu')
-        with torch.inference_mode():
+        x=torch.tensor(np.stack(images),dtype=torch.float32,device=self.device)
+        with torch.inference_mode(), precision_context(self.device,self.precision):
             p=self.model(x)
             e,k=self.decode_pose(p['pose_enc'],x.shape[-2:])
         # Follow upstream inference.py use_depth=True. The checkpoint's point head is not the
         # production reconstruction path; use predicted depth and predicted camera parameters.
         names=['gs_map','dynamic_conf','depth','depth_conf']
         result={n:p[n].float().cpu().numpy() for n in names}
-        result['world_points']=self.unproject(result['depth'][0],e[0].numpy(),k[0].numpy())[None]
+        result['world_points']=self.unproject(result['depth'][0],e[0].float().cpu().numpy(),k[0].float().cpu().numpy())[None]
         result['world_points_conf']=result['depth_conf']
-        return result,e[0,-1].float().numpy(),k[0,-1].float().numpy()
+        return result,e[0,-1].float().cpu().numpy(),k[0,-1].float().cpu().numpy()
 
-def cache(dataset,raw,output,upstream,checkpoint,width=140,context=2,threads=2):
-    if not 1<=context<=4:raise ValueError('CPU context budget: 1..4')
+def cache(dataset,raw,output,upstream,checkpoint,width=518,context=4,threads=2,device='cuda',precision='fp32'):
+    if not 1<=context<=64:raise ValueError('context must be in [1,64]')
     dataset=Path(dataset);raw=Path(raw);output=fresh_dir(output)
     index=read_json(dataset/'dataset.json')
-    model=NativeDGGT(upstream,checkpoint,width,threads)
+    model=NativeDGGT(upstream,checkpoint,width,threads,device,precision)
     checkpoint_hash=sha256(checkpoint)
     import subprocess
     commit=subprocess.check_output(['git','-C',str(upstream),'rev-parse','HEAD'],text=True).strip()
@@ -123,8 +125,8 @@ def cache(dataset,raw,output,upstream,checkpoint,width=140,context=2,threads=2):
         meta=f'{e["scene_id"]}.dggt.json'
         write_json(output/meta,{'upstream':'https://github.com/xiaomi-research/dggt','upstream_commit':commit,
             'checkpoint_sha256':checkpoint_hash,'checkpoint_name':Path(checkpoint).name,
-            'device':'cpu','causal':True,'max_context_frames':context,'input_width':width,
-            'resolution_note':'Reduced-width CPU integration run; not native-resolution benchmark.',
+            'device':str(model.device),'precision':precision,'causal':True,'max_context_frames':context,'input_width':width,
+            'resolution_note':'Native width' if width==518 else 'Reduced input width; not a native-resolution benchmark',
             'frames':history,'input_dataset_sha256':sha256(dataset/'dataset.json')})
         e.update({'sha256':sha256(output/e['path']),'geometry_source':'dggt','geometry_metadata':meta})
     index['geometry_note']='Native pretrained DGGT, historical stereo scale anchoring; no road/drivability ground truth'
@@ -137,7 +139,9 @@ def main():
     p=argparse.ArgumentParser();p.add_argument('--dataset',required=True)
     p.add_argument('--raw',default='data/kitti/raw');p.add_argument('--output',required=True)
     p.add_argument('--upstream',default='third_party/dggt');p.add_argument('--checkpoint',default='checkpoints/model_latest_waymo.pth')
-    p.add_argument('--width',type=int,default=140);p.add_argument('--context',type=int,default=2)
-    p.add_argument('--threads',type=int,default=2);a=p.parse_args()
+    p.add_argument('--width',type=int,default=518);p.add_argument('--context',type=int,default=4)
+    p.add_argument('--threads',type=int,default=2)
+    p.add_argument('--device',default='cuda');p.add_argument('--precision',choices=['fp32','fp16','bf16'],default='fp32')
+    a=p.parse_args()
     print(cache(**vars(a)))
 if __name__=='__main__':main()
