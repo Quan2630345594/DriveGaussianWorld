@@ -1,0 +1,283 @@
+{
+  "schema_version": 1,
+  "audit_date": "2026-10-16",
+  "status": "PINNED_VERIFIED",
+  "status_scope": "Actual pinned remote metadata and source text inspected; not full numerical or runtime compatibility",
+  "runtime_verified": false,
+  "official_action_binding": "PENDING",
+  "official_gaussian_binding": "PENDING",
+  "training": "NOT_RUN",
+  "gpu": "NOT_USED",
+  "repository": "https://github.com/Gaussian-World-Model/gaussianwm",
+  "commit": "433f750ee227e034c3e5916c274fc4b696fb3a39",
+  "tree": "5228302bbf952303e2a68df067e15b0c44830496",
+  "commit_metadata_url": "https://api.github.com/repos/Gaussian-World-Model/gaussianwm/git/commits/433f750ee227e034c3e5916c274fc4b696fb3a39",
+  "tree_metadata_url": "https://api.github.com/repos/Gaussian-World-Model/gaussianwm/git/trees/5228302bbf952303e2a68df067e15b0c44830496?recursive=1",
+  "commit_signature_verified": false,
+  "source_hash_definition": "SHA256 of raw HTTPS response bytes, no newline normalization",
+  "evidence": {
+    "regressor": {
+      "path": "gaussianwm/processor/regressor.py",
+      "url": "https://raw.githubusercontent.com/Gaussian-World-Model/gaussianwm/433f750ee227e034c3e5916c274fc4b696fb3a39/gaussianwm/processor/regressor.py",
+      "sha256": "6a379fdfc6e158b48a19f7c7696ef44149f618d22c0c83a3a01e525fde73993d",
+      "git_blob_verified": "14e421a43ba9345e4deec423ffecc56379aebb71",
+      "anchors": ["gaussian_feature_to_dim = OrderedDict({", "def get_gaussain_tensor(pred):", "for key, value in gaussian_feature_to_dim.items() if key in pred", "SH_C0 = 0.28209479177387814", "pred2['means_in_other_view'] = pred2.pop('means')"]
+    },
+    "datasets": {
+      "path": "gaussianwm/processor/datasets.py",
+      "url": "https://raw.githubusercontent.com/Gaussian-World-Model/gaussianwm/433f750ee227e034c3e5916c274fc4b696fb3a39/gaussianwm/processor/datasets.py",
+      "sha256": "e29f393526073faa856660c1efb2ae789a78b592debbdea51ba5df78fdf7e7ae",
+      "git_blob_verified": "fd081b31a94d290a8a91b7c03d45038b4643e506",
+      "anchors": ["def droid_dataset_transform(trajectory):", "def robomimic_transform(trajectory):", "\"actions\": trajectory[\"action\"][1:]", "\"absolute_action_mask\": [True] * 10", "\"action_normalization_mask\": [True] * 9 + [False]", "yield obs, action, reward"]
+    },
+    "predictor": {
+      "path": "gaussianwm/gwm_predictor.py",
+      "url": "https://raw.githubusercontent.com/Gaussian-World-Model/gaussianwm/433f750ee227e034c3e5916c274fc4b696fb3a39/gaussianwm/gwm_predictor.py",
+      "sha256": "8ff60ea63fd266a732b22d00e34eeb0fc4846e7586b2d8ceb5c454d4be315f0d",
+      "git_blob_verified": "9f2620318740f60bf523f0cbdb845ec5e35fc4db",
+      "anchors": ["action_dim=args.action_dim", "def _process_obs(self, obs):", "obs = obs.to(self.device) / 255.", "self.nh = int(math.sqrt(args.vae.num_latents))"]
+    },
+    "vae_training": {
+      "path": "gaussianwm/train_vae.py",
+      "url": "https://raw.githubusercontent.com/Gaussian-World-Model/gaussianwm/433f750ee227e034c3e5916c274fc4b696fb3a39/gaussianwm/train_vae.py",
+      "sha256": "4c5afcaab0ce9c9936bdcff8111de36f75e438ea71ea108435d653e3b85ace67",
+      "git_blob_verified": "2afa9dff5468de97a823d04c981fc9c530ba0205",
+      "anchors": ["colors = 0.5 + SH_C0 * points[..., -4:-1]", "points[..., -4:-1] = colors / 255.0", "points, _ = fps(points, K=cfg.model.point_cloud_size)"]
+    },
+    "diffusion_models": {
+      "path": "gaussianwm/diffusion/models.py",
+      "url": "https://raw.githubusercontent.com/Gaussian-World-Model/gaussianwm/433f750ee227e034c3e5916c274fc4b696fb3a39/gaussianwm/diffusion/models.py",
+      "sha256": "98666dbaec9caf9f8331b6109b5ee75a86ec6bec0e276d6a621ebdbafcc1e322",
+      "git_blob_verified": "4b4d5ba50e475cf44817ebba6d79a96557547a52",
+      "anchors": ["class ActionEmbedder(nn.Module):", "nn.Linear(action_dim, hidden_size, bias=True)", "self.a_embedder = ActionEmbedder(hidden_size, action_dim, class_dropout_prob)"]
+    },
+    "tensor_utils": {
+      "path": "gaussianwm/util/tensor_utils.py",
+      "url": "https://raw.githubusercontent.com/Gaussian-World-Model/gaussianwm/433f750ee227e034c3e5916c274fc4b696fb3a39/gaussianwm/util/tensor_utils.py",
+      "sha256": "fb761ab1dbe35f2d4124708e538d2f7c52f758983b2859e27482219af673aa03",
+      "git_blob_verified": "ec2063b24c5d39333645edcf53a8468ab28a24df",
+      "anchors": ["def to_float(x):", "torch.Tensor: lambda x: x.float()"]
+    },
+    "codec": {
+      "path": "gaussianwm/encoder/models_ae.py",
+      "url": "https://raw.githubusercontent.com/Gaussian-World-Model/gaussianwm/433f750ee227e034c3e5916c274fc4b696fb3a39/gaussianwm/encoder/models_ae.py",
+      "sha256": "258ed7a469394510d80075f1d0304767f5f6ff648b0b29e7a9cd758f4e43c52a",
+      "anchors": ["assert N == self.num_inputs", "_, sampled_indices = fps(pc[..., :3], K=self.num_latents)", "def create_autoencoder("]
+    },
+    "denoiser": {
+      "path": "gaussianwm/diffusion/denoiser.py",
+      "url": "https://raw.githubusercontent.com/Gaussian-World-Model/gaussianwm/433f750ee227e034c3e5916c274fc4b696fb3a39/gaussianwm/diffusion/denoiser.py",
+      "sha256": "14825fbf434c5449195850d7807aabd08fb102b27ddc86e40d121fe48a966753",
+      "anchors": ["seq_length = t - n", "prev_act = batch_action[:, n + i - 1, :].unsqueeze(1)", "all_obs[:, n + i] = denoised"]
+    },
+    "chunks": {
+      "path": "gaussianwm/processor/rlds/traj_transforms.py",
+      "url": "https://raw.githubusercontent.com/Gaussian-World-Model/gaussianwm/433f750ee227e034c3e5916c274fc4b696fb3a39/gaussianwm/processor/rlds/traj_transforms.py",
+      "sha256": "08b8f5fc01e879ff3893d39297e2fc0a4ddc9b4571d9790442df3ca8c3bbf028",
+      "anchors": ["def chunk_act_obs(", "tf.range(-window_size + 1, 1 + future_action_window_size)", "traj[\"observation\"][\"pad_mask\"] = chunk_indices >= 0"]
+    },
+    "dataset_config": {
+      "path": "configs/dataset/droid.yaml",
+      "url": "https://raw.githubusercontent.com/Gaussian-World-Model/gaussianwm/433f750ee227e034c3e5916c274fc4b696fb3a39/configs/dataset/droid.yaml",
+      "sha256": "a3f1a7950c7f99e6d8661d5407c6ac02b3e0e0d16eee29fa38b32383c7d814dd",
+      "anchors": ["segment_length: 10", "context_length: 2", "action_dim: 10", "future_action_window_size: 15"]
+    },
+    "codec_config": {
+      "path": "configs/vae/transformer.yaml",
+      "url": "https://raw.githubusercontent.com/Gaussian-World-Model/gaussianwm/433f750ee227e034c3e5916c274fc4b696fb3a39/configs/vae/transformer.yaml",
+      "sha256": "2a4f7c62d4df3dd3372ff2b4d8b0991734c8e65d4f2b777ac7c232082528bb1e",
+      "anchors": ["point_cloud_size: 2048", "num_latents: 64", "latent_dim: 64", "output_dim: 14", "use_kl: false"]
+    },
+    "world_model_config": {
+      "path": "configs/world_model/gwm.yaml",
+      "url": "https://raw.githubusercontent.com/Gaussian-World-Model/gaussianwm/433f750ee227e034c3e5916c274fc4b696fb3a39/configs/world_model/gwm.yaml",
+      "sha256": "f846e597203de073bd3ff5907c2a5f8824e1c31a63b9b6b65045ba71bfe95d96",
+      "anchors": ["use_gs: false", "use_vae: false", "action_dim: ${dataset.action_dim}"]
+    },
+    "diffusion_training": {
+      "path": "gaussianwm/train_diffusion.py",
+      "url": "https://raw.githubusercontent.com/Gaussian-World-Model/gaussianwm/433f750ee227e034c3e5916c274fc4b696fb3a39/gaussianwm/train_diffusion.py",
+      "sha256": "74343654cc1f6fc6cc44bda22ee42a189aeabe439b8e1d35c99ed4c615a7c04a",
+      "anchors": ["batch[0] = batch[0].permute(0, 1, 4, 2, 3).to(model.device)"]
+    },
+    "reward": {
+      "path": "gaussianwm/reward/reward_model.py",
+      "url": "https://raw.githubusercontent.com/Gaussian-World-Model/gaussianwm/433f750ee227e034c3e5916c274fc4b696fb3a39/gaussianwm/reward/reward_model.py",
+      "sha256": "02f687d6d3a1c1a24e3adae6a18cc496ca9d53826809659dbd8341aabddde3c6",
+      "anchors": ["self.act_emb = ActionEmbedder(cfg.lstm_dim, cfg.action_dim)", "nn.Linear(action_dim, hidden_size, bias=True)"]
+    },
+    "license": {
+      "path": "LICENSE",
+      "url": "https://raw.githubusercontent.com/Gaussian-World-Model/gaussianwm/433f750ee227e034c3e5916c274fc4b696fb3a39/LICENSE",
+      "sha256": "13a6fa7272da565a6901d924ecc45406097d2a1f17c18698c71df4c69192121b",
+      "anchors": ["MIT License", "Copyright (c) 2025 GWM Team"]
+    },
+    "submodules": {
+      "path": ".gitmodules",
+      "url": "https://raw.githubusercontent.com/Gaussian-World-Model/gaussianwm/433f750ee227e034c3e5916c274fc4b696fb3a39/.gitmodules",
+      "sha256": "f692b0794c8e2a07309d2a87dce25ceb35dbbfdc4884e7a23e5ef44594ee6c47",
+      "anchors": ["[submodule \"third_party/splatt3r\"]", "url = https://github.com/btsmart/splatt3r"]
+    },
+    "vae_launch_config": {
+      "path": "configs/train_vae.yaml",
+      "url": "https://raw.githubusercontent.com/Gaussian-World-Model/gaussianwm/433f750ee227e034c3e5916c274fc4b696fb3a39/configs/train_vae.yaml",
+      "sha256": null,
+      "hash_status": "Text fetched; raw byte hash not captured after timeout",
+      "anchors": ["- vae: transformer", "point_cloud_size: 2048"]
+    }
+  },
+  "gaussian_pack": {
+    "evidence_ids": ["regressor", "predictor"],
+    "shape": ["B_times_S", "N", 14],
+    "layout": [
+      {"name": "means", "slice": [0, 3], "components": ["x", "y", "z"], "frame": "view1", "metric_scale": "UNKNOWN"},
+      {"name": "scales", "slice": [3, 6], "components": ["scale_component_0", "scale_component_1", "scale_component_2"], "activation": "UNKNOWN_LIVE_HEAD", "axis_order": "UNKNOWN"},
+      {"name": "rotations", "slice": [6, 10], "components": ["rotation_component_0", "rotation_component_1", "rotation_component_2", "rotation_component_3"], "quaternion_order": "UNKNOWN_LIVE_HEAD", "unit_normalization": "UNKNOWN_LIVE_HEAD"},
+      {"name": "sh", "slice": [10, 13], "components": ["color_component_0", "color_component_1", "color_component_2"], "coefficient_shape_per_pixel": [3, 1], "domain": "HEAD_SH_PLUS_EXTERNAL_RGB2SH_RESIDUAL_BASE", "gamma_convention": "UNKNOWN"},
+      {"name": "opacities", "slice": [13, 14], "components": ["opacity_component_0"], "activation": "UNKNOWN_LIVE_HEAD"}
+    ],
+    "slice_convention": "zero-based half-open",
+    "ordered_dictionary_keys": ["means", "means_in_other_view", "scales", "rotations", "sh", "opacities"],
+    "means_in_other_view_is_alternative_to_means": true,
+    "packer_skips_absent_keys": true,
+    "both_mean_keys_width": 17,
+    "packer_activation": "NONE",
+    "packer_geometric_normalization": "NONE",
+    "live_head_activation_verified": false,
+    "live_head_quaternion_order_verified": false,
+    "external_dependency_revision": null,
+    "dependency_blocker": "Pinned tree has no Splatt3r gitlink or vendored head/geometry/sh_utils source",
+    "ply_loader_only": {
+      "evidence": "regressor.py:505-517",
+      "scales": "exp(stored_scale_0_to_2)",
+      "quaternion_order": "wxyz",
+      "opacity": "sigmoid(stored_opacity)",
+      "covariance": "R @ diag(scales**2) @ R.T",
+      "sh_c0": 0.28209479177387814,
+      "sh_dc_to_rgb": "0.5 + 0.28209479177387814 * sh_dc",
+      "rgb_to_sh_dc_algebraic_inverse": "(rgb - 0.5) / 0.28209479177387814",
+      "external_RGB2SH_implementation_verified": false,
+      "optional_centering": "positions -= mean(positions) when center=True",
+      "applies_to_live_pack": "NOT_ESTABLISHED"
+    },
+    "vae_training_boundary": {
+      "evidence": "vae_training:60-64",
+      "mutated_slice": [10, 13],
+      "formula": "(0.5 + 0.28209479177387814 * raw_pack[...,10:13]) / 255.0",
+      "domain_after_mutation": "SOURCE_COLOR_DIV_255_NOT_RAW_SH",
+      "also_applied_by_predictor": false
+    }
+  },
+  "images": {
+    "evidence_ids": ["datasets", "diffusion_training", "predictor", "vae_training", "tensor_utils"],
+    "sample_shape": ["S", 128, 128, 3],
+    "collated_shape": ["B", "S", 128, 128, 3],
+    "diffusion_input_shape": ["B", "S", 3, 128, 128],
+    "camera": "primary_left_only",
+    "channels": "RGB",
+    "dataset_cast": "if float32 and max<=1: multiply by 255 then uint8; otherwise preserve dtype",
+    "dataset_uint8_guaranteed": false,
+    "diffusion_normalization": "obs.to(device) / 255.0",
+    "diffusion_float_dtype": "PyTorch default floating dtype for uint8 division; not explicitly enforced",
+    "vae_training_cast": "float32 via .float(), no image /255 before regressor",
+    "action_dtype": "preserved by torch.from_numpy; not explicitly cast",
+    "dummy_reward_shape": ["S", 1],
+    "proposed_converter_dtype_policy_not_upstream_guarantee": {"stored_rgb": "uint8", "model_images": "float32", "model_actions": "float32"}
+  },
+  "temporal": {
+    "evidence_ids": ["dataset_config", "chunks", "datasets", "denoiser"],
+    "segment_length": 10,
+    "model_context_length": 2,
+    "future_action_window_size": 15,
+    "observation_count": 10,
+    "pre_shift_action_count": 25,
+    "returned_action_count": 24,
+    "observation_indices_at_anchor_k": "k-9 .. k",
+    "action_indices_before_shift_at_anchor_k": "k-9 .. k+15",
+    "action_indices_after_shift_at_anchor_k": "k-8 .. k+15",
+    "negative_observation_indices": "clamped to 0",
+    "action_boundary_indices": "clamped to [0,goal_timestep]; absolute actions repeat boundary values",
+    "observation_pad_mask_true_means": "valid",
+    "droid_returns_observation_pad_mask": false,
+    "droid_returns_action_mask": false,
+    "denoiser_targets_per_default_segment": 8,
+    "denoiser_context_slice": "i:i+C",
+    "denoiser_action_index": "C+i-1",
+    "denoiser_target_index": "C+i",
+    "denoiser_default_consumed_action_indices": [1, 2, 3, 4, 5, 6, 7, 8],
+    "denoiser_action_shape": ["B", 1, "A"],
+    "dt_returned": false,
+    "parking_interval_alignment_verified": false
+  },
+  "actions": {
+    "evidence_ids": ["datasets", "dataset_config", "world_model_config", "predictor", "denoiser", "diffusion_models", "reward"],
+    "official_dataset_dim": 10,
+    "official_pack_order": ["absolute_cartesian_position_xyz", "euler_derived_rotation_matrix_row_0", "euler_derived_rotation_matrix_row_1", "gripper_position"],
+    "official_pack_widths": [3, 3, 3, 1],
+    "active_transform": "gaussianwm/processor/datasets.py:droid_dataset_transform",
+    "normalization_type_literal": "bounds",
+    "absolute_action_mask_literal": "[True] * 10",
+    "normalization_mask_literal": "[True] * 9 + [False]",
+    "numerical_normalization_statistics_verified": false,
+    "network_width_configurable": true,
+    "config_hook": "configs/dataset/droid.yaml:13 action_dim; configs/world_model/gwm.yaml:53 action_dim: ${dataset.action_dim}",
+    "encoder_hook": "gaussianwm/diffusion/models.py:82-96 ActionEmbedder.mlp[0] nn.Linear(action_dim, hidden_size, bias=True)",
+    "reward_encoder_hook": "gaussianwm/reward/reward_model.py:39-61 ActionEmbedder.mlp[0] and RewardModel.act_emb",
+    "proposed_parking_binding": {
+      "status": "PENDING",
+      "implemented": false,
+      "neutral_control_order": ["signed_speed_command_mps", "steering_rad"],
+      "neutral_dt_field": "dt_s",
+      "model_condition_order": ["signed_speed_command_mps", "steering_rad", "dt_s"],
+      "model_action_dim": 3,
+      "padding_to_10": false,
+      "dt_constraint": "finite and >0",
+      "dataset_hook": "gaussianwm/processor/datasets.py:build_gaussian_splatting_reconstruction_dataset, explicit parking branch",
+      "bypass_robot_specific": ["droid_dataset_transform", "DROID masks", "robot normalization statistics", "robomimic_transform action[1:]"],
+      "linear_weight_shape": ["hidden_size", 3],
+      "ten_input_checkpoint_compatible": false,
+      "required_before_verified": ["declared normalization and units", "issued interval alignment", "dtype/shape and valid-mask tests against authorized official runtime", "train-sampling action shape agreement", "resolve source image/Gaussian mismatches"]
+    }
+  },
+  "codec": {
+    "evidence_ids": ["codec", "codec_config", "world_model_config", "predictor"],
+    "standalone_vae_config": {"N": 2048, "M": 64, "D": 64, "output_dim": 14, "use_kl": false, "depth": 4},
+    "world_model_defaults": {"use_gs": false, "use_vae": false, "N": 4096, "M": 16384, "D": 256, "use_kl": false, "depth": 2},
+    "deterministic_factory_branch": "AutoEncoder",
+    "encoder_input_count_asserted": true,
+    "latent_shape": ["B_times_S", "M", "D"],
+    "predictor_latent_map_shape": ["B", "S", "D", "sqrt(M)", "sqrt(M)"],
+    "map_is_geometric_bev": false
+  },
+  "sampling": {
+    "evidence_ids": ["vae_training", "codec"],
+    "official_import": "from pytorch3d.ops import sample_farthest_points as fps",
+    "outer_sampling": "train_vae.py:64,148 fps(points,K=cfg.model.point_cloud_size), all 14 features AFTER color mutation",
+    "inner_sampling": "models_ae.py:240 fps(pc[...,:3],K=self.num_latents), xyz only then gather full features",
+    "predictor_has_outer_N_sampling": false,
+    "random_start_point_explicitly_passed": false,
+    "library_implementation_and_defaults_verified": false,
+    "deterministic_sampling_verified": false,
+    "official_fps_equivalent": false,
+    "local_sampler_implemented_by_this_audit": false,
+    "independent_converter_requirements": ["explicit sampling name and purpose", "permutation behavior tests", "no row or ID truncation as spatial coverage", "bounded memory", "insufficient-N handling", "opacity and coverage caveats", "no causal or occlusion claim from full-map/frustum sampling"]
+  },
+  "licenses": {
+    "root": "MIT",
+    "regressor_file": "CC BY-NC-SA 4.0, Naver, noncommercial",
+    "third_party_and_checkpoint_clearance": "PENDING",
+    "root_MIT_overrides_file_terms": false
+  },
+  "unresolved": [
+    "Live Gaussian head activation, quaternion ordering/norm, geometric scale and axis conventions",
+    "Imported RGB2SH exact implementation and input range/gamma; verified inverse PLY formula is not a substitute",
+    "Missing pinned Splatt3r source revision",
+    "VAE trainer versus predictor image and color domains differ",
+    "Predictor does not outer-sample to encoder N",
+    "VAE evaluation expects observation dict but DROID returns image tensor",
+    "DROID drops validity masks and does not return dt",
+    "Vehicle action semantics, units, normalization and transition binding",
+    "Causal Gaussian visibility and provenance",
+    "Official end-to-end runtime and Gaussian decode/render contract"
+  ]
+}

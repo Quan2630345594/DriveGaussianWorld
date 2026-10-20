@@ -1,0 +1,15 @@
+Python 3.10.22
+Executable /home/tiger/ProgramFiles/miniconda3/envs/parkings/bin/python
+CPU-only execution; CUDA_VISIBLE_DEVICES empty
+torch==2.4.1+cu124
+torchvision==0.19.1+cu124
+numpy==1.26.4
+scipy==1.15.3
+Pillow==11.3.0
+opencv-python==4.10.0.84
+requests==2.34.2
+pytest==8.4.2
+accelerate==0.34.2
+open3d==0.20.0
+gsplat==1.5.3
+huggingface_hub==0.25.2

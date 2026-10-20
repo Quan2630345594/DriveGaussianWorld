@@ -3,7 +3,7 @@ __pycache__/
 .venv/
 checkpoints/
 release/
-data/
+/data/
 outputs/
 output/*
 !output/.gitkeep
@@ -11,3 +11,9 @@ data/raw/*
 !data/raw/.gitkeep
 data/processed/*
 !data/processed/.gitkeep
+
+runs/
+dist/
+build/
+*.egg-info/
+*.pyc
