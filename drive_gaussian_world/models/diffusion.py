@@ -92,7 +92,10 @@ class DiffusionWorldModel(StochasticWorldModel):
             ri,rt,rm,re,_=self.decode_step(clean,image,tokens,speed,a,delta)
             predicted.append((pi,pt,pm,pe));reconstructed.append((ri,rt,rm,re))
             # Teacher forcing is confined to this training method. Inference uses samples.
-            image=target['rgb'][:,i];tokens=target['tokens'][:,i];speed=next_speed;z=clean
+            image=target['rgb'][:,i]
+            # RGB-only must also remove teacher-forced geometric skip inputs.
+            tokens=target['tokens'][:,i] if self.use_geometry else pt
+            speed=next_speed;z=clean
         prediction_loss,logs=world_loss(stack_predictions(predicted),target)
         codec_loss,_=world_loss(stack_predictions(reconstructed),target)
         noise_loss=torch.stack(noise_losses).mean()

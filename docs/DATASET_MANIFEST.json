@@ -1,0 +1,478 @@
+{
+  "schema_version": 1,
+  "dataset": "KITTI raw road driving",
+  "status": "COMPLETED_AND_VALIDATED",
+  "verified_at_utc": "2026-10-21T14:44:06.804997+00:00",
+  "source": "https://registry.opendata.aws/kitti/",
+  "license": "CC BY-NC-SA 3.0",
+  "collection_root": "data/kitti_driving",
+  "source_archive_bytes": 32368310547,
+  "selected_sensor_bytes": 28006340078,
+  "actual_collection_file_bytes": 28022144714,
+  "episodes": 20,
+  "split_log_counts": {
+    "train": 16,
+    "test": 2,
+    "val": 2
+  },
+  "synchronized_camera_oxts_times": 7915,
+  "rgb_images": 15830,
+  "lidar_scans": 7911,
+  "collection_sha256": "2879cbec03b58f346fee4d09d2facfe32770215ca1765e3f109b3842030cb4d1",
+  "raw_validation_sha256": "a8982ef48f9fdf871e1927f76bb34cee0f1f696a7d904d2a7605a0c93b456b31",
+  "plan_sha256": "1b21ba2a7a4fb925ac7feb3abba5c4d4909717c2e64383b2c3f587b3050a5b10",
+  "raw_validation_status": "PASS",
+  "notes": [
+    "0009 source archive omits LiDAR IDs 177,178,179,180; RGB/OXTS retained and point-cloud availability recorded.",
+    "Stationary candidate 0057 excluded before image collection.",
+    "Same date/platform and possible geographic overlap; not a generalization benchmark.",
+    "No new DGGT cache generation, GPU training or GPU profiling was performed."
+  ],
+  "logs": [
+    {
+      "date": "2011_09_26",
+      "drive": "0005",
+      "split": "train",
+      "url": "https://s3-eu-central-1.amazonaws.com/avg-kitti/raw_data/2011_09_26_drive_0005/2011_09_26_drive_0005_sync.zip",
+      "archive_bytes": 645940900,
+      "archive_sha256": "eaa3635b6ad6a707a8bab53ca38567ada8c78eb743e96d558497872fa436c136",
+      "selected_raw_bytes": 558493904,
+      "scene_id": "2011_09_26_drive_0005_sync",
+      "frames": 154,
+      "mean_forward_speed_m_s": 4.517564736391174,
+      "moving_fraction_over_0_5_m_s": 1.0,
+      "max_sensor_clock_difference_ms": 12.041863,
+      "image_width_height": [
+        [
+          1242,
+          375
+        ]
+      ],
+      "lidar_frames": 154,
+      "source_missing_lidar_ids": []
+    },
+    {
+      "date": "2011_09_26",
+      "drive": "0009",
+      "split": "test",
+      "url": "https://s3-eu-central-1.amazonaws.com/avg-kitti/raw_data/2011_09_26_drive_0009/2011_09_26_drive_0009_sync.zip",
+      "archive_bytes": 1791264044,
+      "archive_sha256": "909639de40540f1d9bd8e3c181d79556ee4852781aa4684999f4cda3f3ef2611",
+      "selected_raw_bytes": 1545116452,
+      "scene_id": "2011_09_26_drive_0009_sync",
+      "frames": 447,
+      "mean_forward_speed_m_s": 7.183010994195655,
+      "moving_fraction_over_0_5_m_s": 0.8948545861297539,
+      "max_sensor_clock_difference_ms": 27.348409,
+      "image_width_height": [
+        [
+          1242,
+          375
+        ]
+      ],
+      "lidar_frames": 443,
+      "source_missing_lidar_ids": [
+        177,
+        178,
+        179,
+        180
+      ]
+    },
+    {
+      "date": "2011_09_26",
+      "drive": "0011",
+      "split": "train",
+      "url": "https://s3-eu-central-1.amazonaws.com/avg-kitti/raw_data/2011_09_26_drive_0011/2011_09_26_drive_0011_sync.zip",
+      "archive_bytes": 939815328,
+      "archive_sha256": "2c2138a5442a5bdc96918e6edec9e4785e63c8b2ac14ff45a57363923e44066f",
+      "selected_raw_bytes": 807280871,
+      "scene_id": "2011_09_26_drive_0011_sync",
+      "frames": 233,
+      "mean_forward_speed_m_s": 4.760912703437129,
+      "moving_fraction_over_0_5_m_s": 0.6566523605150214,
+      "max_sensor_clock_difference_ms": 14.147157,
+      "image_width_height": [
+        [
+          1242,
+          375
+        ]
+      ],
+      "lidar_frames": 233,
+      "source_missing_lidar_ids": []
+    },
+    {
+      "date": "2011_09_26",
+      "drive": "0013",
+      "split": "val",
+      "url": "https://s3-eu-central-1.amazonaws.com/avg-kitti/raw_data/2011_09_26_drive_0013/2011_09_26_drive_0013_sync.zip",
+      "archive_bytes": 630044598,
+      "archive_sha256": "d95ebbda58ab7c4fc096a6393f557ff88455999d91dda2952c7296e6cb3c9faa",
+      "selected_raw_bytes": 542509338,
+      "scene_id": "2011_09_26_drive_0013_sync",
+      "frames": 144,
+      "mean_forward_speed_m_s": 11.663402917013624,
+      "moving_fraction_over_0_5_m_s": 1.0,
+      "max_sensor_clock_difference_ms": 13.953171,
+      "image_width_height": [
+        [
+          1242,
+          375
+        ]
+      ],
+      "lidar_frames": 144,
+      "source_missing_lidar_ids": []
+    },
+    {
+      "date": "2011_09_26",
+      "drive": "0015",
+      "split": "train",
+      "url": "https://s3-eu-central-1.amazonaws.com/avg-kitti/raw_data/2011_09_26_drive_0015/2011_09_26_drive_0015_sync.zip",
+      "archive_bytes": 1206523127,
+      "archive_sha256": "0d381864e65e032f5203b396ea118b28044ab25393f4f2f685b653c50e21f228",
+      "selected_raw_bytes": 1041454668,
+      "scene_id": "2011_09_26_drive_0015_sync",
+      "frames": 297,
+      "mean_forward_speed_m_s": 11.868594481910483,
+      "moving_fraction_over_0_5_m_s": 1.0,
+      "max_sensor_clock_difference_ms": 12.550236,
+      "image_width_height": [
+        [
+          1242,
+          375
+        ]
+      ],
+      "lidar_frames": 297,
+      "source_missing_lidar_ids": []
+    },
+    {
+      "date": "2011_09_26",
+      "drive": "0027",
+      "split": "train",
+      "url": "https://s3-eu-central-1.amazonaws.com/avg-kitti/raw_data/2011_09_26_drive_0027/2011_09_26_drive_0027_sync.zip",
+      "archive_bytes": 849872514,
+      "archive_sha256": "572f020610892cf00ac866e82cc6d0bdb6084564306e99e8f0d988db1604ba0b",
+      "selected_raw_bytes": 734237051,
+      "scene_id": "2011_09_26_drive_0027_sync",
+      "frames": 188,
+      "mean_forward_speed_m_s": 17.89945044360335,
+      "moving_fraction_over_0_5_m_s": 1.0,
+      "max_sensor_clock_difference_ms": 14.929754,
+      "image_width_height": [
+        [
+          1242,
+          375
+        ]
+      ],
+      "lidar_frames": 188,
+      "source_missing_lidar_ids": []
+    },
+    {
+      "date": "2011_09_26",
+      "drive": "0028",
+      "split": "train",
+      "url": "https://s3-eu-central-1.amazonaws.com/avg-kitti/raw_data/2011_09_26_drive_0028/2011_09_26_drive_0028_sync.zip",
+      "archive_bytes": 1907576425,
+      "archive_sha256": "fff4e94911f7206b3b3abe0b209e7b4f57116dd744893049a70df2a75f4c1ab6",
+      "selected_raw_bytes": 1645335718,
+      "scene_id": "2011_09_26_drive_0028_sync",
+      "frames": 430,
+      "mean_forward_speed_m_s": 17.55381750871938,
+      "moving_fraction_over_0_5_m_s": 1.0,
+      "max_sensor_clock_difference_ms": 26.654509,
+      "image_width_height": [
+        [
+          1242,
+          375
+        ]
+      ],
+      "lidar_frames": 430,
+      "source_missing_lidar_ids": []
+    },
+    {
+      "date": "2011_09_26",
+      "drive": "0029",
+      "split": "train",
+      "url": "https://s3-eu-central-1.amazonaws.com/avg-kitti/raw_data/2011_09_26_drive_0029/2011_09_26_drive_0029_sync.zip",
+      "archive_bytes": 1684284933,
+      "archive_sha256": "05d54f647f5ca596f100ade09735fbcb9767aaf15a7ee97b0c61d0e06cce8fc4",
+      "selected_raw_bytes": 1459186880,
+      "scene_id": "2011_09_26_drive_0029_sync",
+      "frames": 430,
+      "mean_forward_speed_m_s": 7.905514111617112,
+      "moving_fraction_over_0_5_m_s": 0.8348837209302326,
+      "max_sensor_clock_difference_ms": 14.667528,
+      "image_width_height": [
+        [
+          1242,
+          375
+        ]
+      ],
+      "lidar_frames": 430,
+      "source_missing_lidar_ids": []
+    },
+    {
+      "date": "2011_09_26",
+      "drive": "0032",
+      "split": "train",
+      "url": "https://s3-eu-central-1.amazonaws.com/avg-kitti/raw_data/2011_09_26_drive_0032/2011_09_26_drive_0032_sync.zip",
+      "archive_bytes": 1451679572,
+      "archive_sha256": "38b20c2b11d08ec49819dd9c25ce72761ae0c345d9fb54765f663027220d3a79",
+      "selected_raw_bytes": 1268703329,
+      "scene_id": "2011_09_26_drive_0032_sync",
+      "frames": 390,
+      "mean_forward_speed_m_s": 14.302328268406372,
+      "moving_fraction_over_0_5_m_s": 1.0,
+      "max_sensor_clock_difference_ms": 14.688041,
+      "image_width_height": [
+        [
+          1242,
+          375
+        ]
+      ],
+      "lidar_frames": 390,
+      "source_missing_lidar_ids": []
+    },
+    {
+      "date": "2011_09_26",
+      "drive": "0051",
+      "split": "train",
+      "url": "https://s3-eu-central-1.amazonaws.com/avg-kitti/raw_data/2011_09_26_drive_0051/2011_09_26_drive_0051_sync.zip",
+      "archive_bytes": 1702327445,
+      "archive_sha256": "346ebe14d3e8d96b23cdb86985f2c65f319032bbe920a586cca85438167160d0",
+      "selected_raw_bytes": 1475957543,
+      "scene_id": "2011_09_26_drive_0051_sync",
+      "frames": 438,
+      "mean_forward_speed_m_s": 5.626880426488113,
+      "moving_fraction_over_0_5_m_s": 0.6301369863013698,
+      "max_sensor_clock_difference_ms": 20.092988,
+      "image_width_height": [
+        [
+          1242,
+          375
+        ]
+      ],
+      "lidar_frames": 438,
+      "source_missing_lidar_ids": []
+    },
+    {
+      "date": "2011_09_26",
+      "drive": "0056",
+      "split": "val",
+      "url": "https://s3-eu-central-1.amazonaws.com/avg-kitti/raw_data/2011_09_26_drive_0056/2011_09_26_drive_0056_sync.zip",
+      "archive_bytes": 1214030003,
+      "archive_sha256": "ba8f6b74c0e217a4fb507dac7b73eb2c962d5d142be4a782b2522b43067e1ef1",
+      "selected_raw_bytes": 1054175497,
+      "scene_id": "2011_09_26_drive_0056_sync",
+      "frames": 294,
+      "mean_forward_speed_m_s": 13.845588205292309,
+      "moving_fraction_over_0_5_m_s": 1.0,
+      "max_sensor_clock_difference_ms": 19.301957,
+      "image_width_height": [
+        [
+          1242,
+          375
+        ]
+      ],
+      "lidar_frames": 294,
+      "source_missing_lidar_ids": []
+    },
+    {
+      "date": "2011_09_26",
+      "drive": "0059",
+      "split": "test",
+      "url": "https://s3-eu-central-1.amazonaws.com/avg-kitti/raw_data/2011_09_26_drive_0059/2011_09_26_drive_0059_sync.zip",
+      "archive_bytes": 1517489971,
+      "archive_sha256": "9fcb9d904380742d93c6d4ad96c4855b41fb7d5443a03a497c38d640d6370348",
+      "selected_raw_bytes": 1312395384,
+      "scene_id": "2011_09_26_drive_0059_sync",
+      "frames": 373,
+      "mean_forward_speed_m_s": 5.557159925290321,
+      "moving_fraction_over_0_5_m_s": 0.9302949061662198,
+      "max_sensor_clock_difference_ms": 30.514511,
+      "image_width_height": [
+        [
+          1242,
+          375
+        ]
+      ],
+      "lidar_frames": 373,
+      "source_missing_lidar_ids": []
+    },
+    {
+      "date": "2011_09_26",
+      "drive": "0061",
+      "split": "train",
+      "url": "https://s3-eu-central-1.amazonaws.com/avg-kitti/raw_data/2011_09_26_drive_0061/2011_09_26_drive_0061_sync.zip",
+      "archive_bytes": 3049963820,
+      "archive_sha256": "1f37dc81719f34af5197c20064bc0db75f9d155fa8b0be390679bfd65e6f2f69",
+      "selected_raw_bytes": 2637754495,
+      "scene_id": "2011_09_26_drive_0061_sync",
+      "frames": 703,
+      "mean_forward_speed_m_s": 6.769400933521904,
+      "moving_fraction_over_0_5_m_s": 1.0,
+      "max_sensor_clock_difference_ms": 30.700975,
+      "image_width_height": [
+        [
+          1242,
+          375
+        ]
+      ],
+      "lidar_frames": 703,
+      "source_missing_lidar_ids": []
+    },
+    {
+      "date": "2011_09_26",
+      "drive": "0064",
+      "split": "train",
+      "url": "https://s3-eu-central-1.amazonaws.com/avg-kitti/raw_data/2011_09_26_drive_0064/2011_09_26_drive_0064_sync.zip",
+      "archive_bytes": 2376539657,
+      "archive_sha256": "870a9213e73e79611d24630845680b820a343562806e74bda7069c61b5e279b2",
+      "selected_raw_bytes": 2052560993,
+      "scene_id": "2011_09_26_drive_0064_sync",
+      "frames": 570,
+      "mean_forward_speed_m_s": 7.433659003915991,
+      "moving_fraction_over_0_5_m_s": 1.0,
+      "max_sensor_clock_difference_ms": 25.266962,
+      "image_width_height": [
+        [
+          1242,
+          375
+        ]
+      ],
+      "lidar_frames": 570,
+      "source_missing_lidar_ids": []
+    },
+    {
+      "date": "2011_09_26",
+      "drive": "0070",
+      "split": "train",
+      "url": "https://s3-eu-central-1.amazonaws.com/avg-kitti/raw_data/2011_09_26_drive_0070/2011_09_26_drive_0070_sync.zip",
+      "archive_bytes": 1759098358,
+      "archive_sha256": "72140381828dd5ab937a2d87797933d3173f0a6a890f10740b0b860f514fd3a9",
+      "selected_raw_bytes": 1524625264,
+      "scene_id": "2011_09_26_drive_0070_sync",
+      "frames": 420,
+      "mean_forward_speed_m_s": 14.857727439531136,
+      "moving_fraction_over_0_5_m_s": 1.0,
+      "max_sensor_clock_difference_ms": 34.10074,
+      "image_width_height": [
+        [
+          1242,
+          375
+        ]
+      ],
+      "lidar_frames": 420,
+      "source_missing_lidar_ids": []
+    },
+    {
+      "date": "2011_09_26",
+      "drive": "0084",
+      "split": "train",
+      "url": "https://s3-eu-central-1.amazonaws.com/avg-kitti/raw_data/2011_09_26_drive_0084/2011_09_26_drive_0084_sync.zip",
+      "archive_bytes": 1574584300,
+      "archive_sha256": "1e37451bb4d84fa5a40fd19f94e9deb1606911f6bffe673517c77d418b4f46fb",
+      "selected_raw_bytes": 1358482890,
+      "scene_id": "2011_09_26_drive_0084_sync",
+      "frames": 383,
+      "mean_forward_speed_m_s": 6.012570676287413,
+      "moving_fraction_over_0_5_m_s": 0.8537859007832899,
+      "max_sensor_clock_difference_ms": 18.305015,
+      "image_width_height": [
+        [
+          1242,
+          375
+        ]
+      ],
+      "lidar_frames": 383,
+      "source_missing_lidar_ids": []
+    },
+    {
+      "date": "2011_09_26",
+      "drive": "0091",
+      "split": "train",
+      "url": "https://s3-eu-central-1.amazonaws.com/avg-kitti/raw_data/2011_09_26_drive_0091/2011_09_26_drive_0091_sync.zip",
+      "archive_bytes": 1419552280,
+      "archive_sha256": "52a1131b3158cd1411d450ed671fafe36e8965a1112bfaee6837edf81338b6af",
+      "selected_raw_bytes": 1230580533,
+      "scene_id": "2011_09_26_drive_0091_sync",
+      "frames": 340,
+      "mean_forward_speed_m_s": 5.6329175993012806,
+      "moving_fraction_over_0_5_m_s": 1.0,
+      "max_sensor_clock_difference_ms": 15.991642,
+      "image_width_height": [
+        [
+          1242,
+          375
+        ]
+      ],
+      "lidar_frames": 340,
+      "source_missing_lidar_ids": []
+    },
+    {
+      "date": "2011_09_26",
+      "drive": "0093",
+      "split": "train",
+      "url": "https://s3-eu-central-1.amazonaws.com/avg-kitti/raw_data/2011_09_26_drive_0093/2011_09_26_drive_0093_sync.zip",
+      "archive_bytes": 1720308957,
+      "archive_sha256": "1fdc48be304a030911413fb9b2010957b5ce2cf7b3162f1fcaa8e6a6bc11c9f4",
+      "selected_raw_bytes": 1492128799,
+      "scene_id": "2011_09_26_drive_0093_sync",
+      "frames": 433,
+      "mean_forward_speed_m_s": 4.004635645373636,
+      "moving_fraction_over_0_5_m_s": 0.9930715935334873,
+      "max_sensor_clock_difference_ms": 24.629585,
+      "image_width_height": [
+        [
+          1242,
+          375
+        ]
+      ],
+      "lidar_frames": 433,
+      "source_missing_lidar_ids": []
+    },
+    {
+      "date": "2011_09_26",
+      "drive": "0101",
+      "split": "train",
+      "url": "https://s3-eu-central-1.amazonaws.com/avg-kitti/raw_data/2011_09_26_drive_0101/2011_09_26_drive_0101_sync.zip",
+      "archive_bytes": 3617310729,
+      "archive_sha256": "b0d2c5169df9de4500ce71783281854113f174b21c4f68394c9d94bf798fced7",
+      "selected_raw_bytes": 3136516056,
+      "scene_id": "2011_09_26_drive_0101_sync",
+      "frames": 936,
+      "mean_forward_speed_m_s": 13.418381682553775,
+      "moving_fraction_over_0_5_m_s": 0.907051282051282,
+      "max_sensor_clock_difference_ms": 15.900389,
+      "image_width_height": [
+        [
+          1242,
+          375
+        ]
+      ],
+      "lidar_frames": 936,
+      "source_missing_lidar_ids": []
+    },
+    {
+      "date": "2011_09_26",
+      "drive": "0104",
+      "split": "train",
+      "url": "https://s3-eu-central-1.amazonaws.com/avg-kitti/raw_data/2011_09_26_drive_0104/2011_09_26_drive_0104_sync.zip",
+      "archive_bytes": 1310103586,
+      "archive_sha256": "c65fc6b2773524bf7b11b245bd75b3d07a27bb43362f8321b09efe43080dcc5f",
+      "selected_raw_bytes": 1128844413,
+      "scene_id": "2011_09_26_drive_0104_sync",
+      "frames": 312,
+      "mean_forward_speed_m_s": 7.659739746103987,
+      "moving_fraction_over_0_5_m_s": 1.0,
+      "max_sensor_clock_difference_ms": 32.184173,
+      "image_width_height": [
+        [
+          1242,
+          375
+        ]
+      ],
+      "lidar_frames": 312,
+      "source_missing_lidar_ids": []
+    }
+  ]
+}

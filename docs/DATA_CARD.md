@@ -22,6 +22,14 @@ The expanded collector preserves all available color stereo frames, OXTS, timest
 
 Actual planned bytes, frame IDs, sampled speeds and archive provenance are saved in `data/kitti_driving/download_plan.json`. Download state is in `status.json`; only `COMPLETED` together with the final `collection.json` denotes a finished collection. `prepare --all-collected` uses these declared log splits and frames, rather than selecting unrelated files found in the directory. The original subset and original experiment results remain separate.
 
+## Completed collection
+
+The expanded collection completed and passed raw-source validation on 2026-10-21. It contains **20 driving logs**, **7,915 synchronized camera/OXTS times**, **15,830 RGB images** and **7,911 LiDAR scans**. Source ZIPs total 32.37 GB; retained sensors and metadata occupy approximately **28.02 GB** (decimal), below 50 GB. Splits contain 16 training, 2 validation and 2 test logs. Per-log source ZIP SHA256, full-log speed summaries and counts are in [DATASET_MANIFEST.json](DATASET_MANIFEST.json).
+
+The official `0009` source ZIP contains no LiDAR scans for image IDs **177, 178, 179, 180**. The downloaded point-cloud list matches the source archive exactly; camera/OXTS frames remain available. Independent geometry evaluation must use the recorded LiDAR availability rather than inventing point clouds or treating the absence as a transfer failure.
+
+Validation checks complete RGB/OXTS frame IDs, LiDAR source-member availability, increasing camera/OXTS timestamps and alignment within 50 ms, finite OXTS, whole-log mean motion above 1 m/s, PNG signatures/dimensions and XYZI record sizes. It does not run scene reconstruction or train a model. Full raw verification is recorded locally in `data/kitti_driving/raw_validation.json`; per-member CRC32/SHA256 and source archive hashes are in `collection.json`. The new dataset has not been used for a new DGGT cache or model performance claim.
+
 ## Collection and integrity
 
 `collect` reads ZIP central directories and requests only selected public members. Each member is checked against its ZIP CRC32, with a locally computed SHA256 saved in `data/kitti/collection.json`. Hashes identify exact downloaded bytes; they are not upstream digital signatures. Collection checks OXTS motion before fetching the image interval. Preparation requires the complete configured frame set, valid time ordering and sensor alignment.

@@ -151,3 +151,17 @@ def test_profiler_cpu_contract_uses_cuda_build_without_gpu(name,tmp_path):
     assert result['parameters']>0 and result['mean_rollout_ms']>0
     assert result['peak_cuda_allocated_bytes'] is None
     assert not torch.cuda.is_initialized()
+
+
+def test_diffusion_rgb_only_training_has_no_teacher_geometry_skip(dataset):
+    b=get_batch(dataset);m=make_model('diffusion');m.use_geometry=False
+    original=m.decode_step;inputs=[]
+    def capture(h,image,tokens,speed,a,delta):
+        inputs.append(tokens.detach().clone())
+        return original(h,image,tokens,speed,a,delta)
+    m.decode_step=capture
+    torch.manual_seed(71);m.training_loss(b['observation'],**b['condition'],target=b['target'])
+    first=inputs.copy();inputs.clear()
+    b['target']['tokens'].fill_(7);b['target']['mask'].fill_(False)
+    torch.manual_seed(71);m.training_loss(b['observation'],**b['condition'],target=b['target'])
+    for x,y in zip(first,inputs):torch.testing.assert_close(x,y,rtol=0,atol=0)

@@ -142,11 +142,14 @@ python -m drive_gaussian_world audit \
 # 先查看实际文件大小与预算；只读取元数据和少量 OXTS。
 python -m drive_gaussian_world download-drives --preflight --root data/kitti_driving
 python -m drive_gaussian_world download-drives --root data/kitti_driving
+python scripts/verify_raw_collection.py --root data/kitti_driving
 
 # 后续准备全部日志的训练窗口；此步骤会计算双目参考几何。
 python -m drive_gaussian_world prepare --raw data/kitti_driving/raw \
   --all-collected --stride 4 --output data/processed/kitti_driving_stereo
 ```
+
+已完成的扩展子集包含 **20 条行车日志、7,915 个同步时刻**，保留数据及清单约 **28.02GB**，按 **16 / 2 / 2** 条日志划分训练、验证与测试。来源哈希、实际规模和 LiDAR 可用性见 [数据摘要](docs/DATASET_MANIFEST.json) 与 [数据卡](docs/DATA_CARD.md)。
 
 需要代理时，可在本机运行 `ssh -N -R 127.0.0.1:17892:127.0.0.1:7890 <server>`，在服务器显式设置 `DGW_HTTP_PROXY=http://127.0.0.1:17892`。转发只监听服务器回环地址；端口被占用时选择其他空闲端口。默认忽略其他 shell 代理变量，可直接访问官方 S3。`DGW_TRANSFER_WORKERS=16` 可调整每条日志的分块并发数，允许范围为 1 到 32；最多同时处理两条日志。代码和 CI 使用 CUDA 版 PyTorch；在没有 GPU 任务配额时仍可显式选择 `--device cpu` 做小型验证，无需安装 CPU 专用发行版。
 

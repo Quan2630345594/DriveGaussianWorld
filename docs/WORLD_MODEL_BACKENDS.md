@@ -61,7 +61,7 @@ L_diffusion = L_world(decode(z_estimate))
             + denoising_weight * L_noise
 ```
 
-The target latent encoder learns through its reconstruction term, while denoising targets are detached. Target latent and previous true scene are teacher forced only during training; inference recursively uses sampled latents and predicted scene outputs. The reconstruction branch is an initial jointly learned codec, not a pretrained or separately benchmarked autoencoder. Latent collapse, codec quality and teacher-forcing exposure bias must be checked when training on more data.
+The target latent encoder learns through its reconstruction term, while denoising targets are detached. Target latent and previous true scene are teacher forced only during training; inference recursively uses sampled latents and predicted scene outputs. RGB-only training retains predicted geometry in the recurrent skip path; true geometry is used only as a loss target. The reconstruction branch is an initial jointly learned codec, not a pretrained or separately benchmarked autoencoder. Latent collapse, codec quality and teacher-forcing exposure bias must be checked when training on more data.
 
 Inference uses a subsampled DDIM update with eta=0, starting from Gaussian noise. Different initial noise produces different futures. Defaults: 100 noise levels and 20 denoiser evaluations per future step. The final noise level has low signal due to the cosine schedule. Estimated clean latents are clamped to `[-5,5]` for numerical stability. Diffusion arithmetic and KL calculations use float32 where needed; GPU mixed precision remains configurable.
 
@@ -115,7 +115,7 @@ Reports include parameter count, synchronized mean/median inference latency, thr
 
 ## Framework validation
 
-On 2026-10-21, the server's Python 3.10 / PyTorch 2.4.1+cu124 environment passed 54 tests. These cover causal inference boundaries, backend gradients, seeded sampling, action response, old/new checkpoints, one-step fixture training, evaluation/demo/API integration, deferred profiler contracts, dataset byte budgets, CRC/SHA recording and interrupted download recovery. Tests use small tensors without GPU execution. No large training, DGGT rerun or CUDA memory/latency benchmark was performed.
+On 2026-10-21, the server's Python 3.10 / PyTorch 2.4.1+cu124 environment passed 55 tests. These cover causal inference boundaries, backend gradients, seeded sampling, action response, old/new checkpoints, one-step fixture training, evaluation/demo/API integration, deferred profiler contracts, dataset byte budgets, CRC/SHA recording and interrupted download recovery. Tests use small tensors without GPU execution. No large training, DGGT rerun or CUDA memory/latency benchmark was performed.
 
 ## References
 
