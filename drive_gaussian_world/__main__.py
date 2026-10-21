@@ -4,10 +4,15 @@ import importlib.util
 import json
 import sys
 
-COMMANDS={'collect':'data.range_collect','prepare':'data.prepare','dggt-cache':'geometry.dggt',
+COMMANDS={'profile':'profile_model','download-drives':'data.download_drives','collect':'data.range_collect','prepare':'data.prepare','dggt-cache':'geometry.dggt',
           'serve':'serve','train':'train','evaluate':'evaluate','demo':'demo','experiments':'experiments','audit':'data.audit'}
 
 def main():
+    # Dispatch before parsing so subcommand --help reaches its own argument parser.
+    if len(sys.argv)>1 and sys.argv[1] in COMMANDS:
+        command=sys.argv[1];sys.argv=[sys.argv[0],*sys.argv[2:]]
+        importlib.import_module('drive_gaussian_world.'+COMMANDS[command]).main()
+        return
     parser=argparse.ArgumentParser(prog='python -m drive_gaussian_world',description='DriveGaussianWorld tools')
     parser.add_argument('command',choices=[*COMMANDS,'validate','doctor'])
     args,remaining=parser.parse_known_args();sys.argv=[sys.argv[0],*remaining]

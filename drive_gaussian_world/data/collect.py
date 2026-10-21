@@ -5,6 +5,7 @@ bytes; they are local provenance hashes, not upstream authenticity signatures.
 """
 from __future__ import annotations
 import argparse
+import os
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path, PurePosixPath
 import time
@@ -12,9 +13,17 @@ import zipfile
 import requests
 from drive_gaussian_world.common import sha256, write_json
 
-HOST = 'https://s3.eu-central-1.amazonaws.com/avg-kitti/raw_data/'
+HOST = 'https://s3-eu-central-1.amazonaws.com/avg-kitti/raw_data/'
 DRIVES = {'train': '0005', 'val': '0013', 'test': '0009'}
 DATE = '2011_09_26'
+
+def download_session():
+    session = requests.Session()
+    # Explicit project proxy; ignore unrelated/dead shell proxies by default.
+    session.trust_env = False
+    proxy = os.environ.get('DGW_HTTP_PROXY')
+    if proxy:session.proxies.update({'http':proxy,'https':proxy})
+    return session
 
 def fetch(url, target, max_bytes=1_500_000_000):
     target = Path(target)
@@ -26,8 +35,7 @@ def fetch(url, target, max_bytes=1_500_000_000):
                 raise ValueError(f'corrupt archive: {target}')
         return target
     partial = target.with_suffix('.part')
-    session = requests.Session()
-    session.trust_env = False  # Server has an unavailable localhost proxy in its environment.
+    session = download_session()
     for attempt in range(3):
         try:
             with session.get(url, stream=True, timeout=(15, 45)) as response:
@@ -76,7 +84,7 @@ def extract(archive, root, frame_limit):
 
 def collect(root, frame_limit=128):
     if not 16 <= frame_limit <= 300:
-        raise ValueError('CPU collection budget: 16..300 frames per drive')
+        raise ValueError('collection budget: 16..300 frames per drive')
     root = Path(root)
     root.mkdir(parents=True, exist_ok=True)
     jobs = [('calibration', DATE + '_calib.zip', DATE + '_calib.zip')]

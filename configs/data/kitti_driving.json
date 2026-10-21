@@ -1,0 +1,102 @@
+[
+  {
+    "date": "2011_09_26",
+    "drive": "0005",
+    "split": "train"
+  },
+  {
+    "date": "2011_09_26",
+    "drive": "0011",
+    "split": "train"
+  },
+  {
+    "date": "2011_09_26",
+    "drive": "0015",
+    "split": "train"
+  },
+  {
+    "date": "2011_09_26",
+    "drive": "0027",
+    "split": "train"
+  },
+  {
+    "date": "2011_09_26",
+    "drive": "0028",
+    "split": "train"
+  },
+  {
+    "date": "2011_09_26",
+    "drive": "0029",
+    "split": "train"
+  },
+  {
+    "date": "2011_09_26",
+    "drive": "0032",
+    "split": "train"
+  },
+  {
+    "date": "2011_09_26",
+    "drive": "0051",
+    "split": "train"
+  },
+  {
+    "date": "2011_09_26",
+    "drive": "0059",
+    "split": "test"
+  },
+  {
+    "date": "2011_09_26",
+    "drive": "0061",
+    "split": "train"
+  },
+  {
+    "date": "2011_09_26",
+    "drive": "0064",
+    "split": "train"
+  },
+  {
+    "date": "2011_09_26",
+    "drive": "0070",
+    "split": "train"
+  },
+  {
+    "date": "2011_09_26",
+    "drive": "0084",
+    "split": "train"
+  },
+  {
+    "date": "2011_09_26",
+    "drive": "0091",
+    "split": "train"
+  },
+  {
+    "date": "2011_09_26",
+    "drive": "0093",
+    "split": "train"
+  },
+  {
+    "date": "2011_09_26",
+    "drive": "0101",
+    "split": "train"
+  },
+  {
+    "date": "2011_09_26",
+    "drive": "0104",
+    "split": "train"
+  },
+  {
+    "date": "2011_09_26",
+    "drive": "0013",
+    "split": "val"
+  },
+  {
+    "date": "2011_09_26",
+    "drive": "0056",
+    "split": "val"
+  },
+  {
+    "date": "2011_09_26",
+    "drive": "0009",
+    "split": "test"
+  }
+]

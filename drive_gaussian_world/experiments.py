@@ -18,17 +18,20 @@ def run(dataset,output,config='configs/default.json',stereo_dataset=None,device=
     experiments=[('dggt_world',dataset,False,False),('rgb_only',dataset,True,False),
                  ('no_actions',dataset,False,True)]
     if stereo_dataset:experiments.append(('stereo_world',stereo_dataset,False,False))
+    if 'backends' in cfg:
+        experiments=[(name,dataset,False,False) for name in cfg['backends']]
     summaries={}
     try:
         for name,data,no_geom,no_action in experiments:
             status['active_stage']=name;write_json(out/'status.json',status)
-            checkpoint=train(data,out/name,**cfg['training'],**cfg['model'],seed=cfg['seed'],
+            backend_options=cfg.get('backends',{}).get(name,{})
+            checkpoint=train(data,out/name,**cfg['training'],**cfg['model'],**backend_options,seed=cfg['seed'],
                 threads=cfg['threads'],no_geometry=no_geom,no_actions=no_action,device=cfg['device'],precision=cfg.get('precision','fp32'))
-            evaluation=evaluate(data,checkpoint,out/name/'test.json',device=cfg['device'])
+            evaluation=evaluate(data,checkpoint,out/name/'test.json',device=cfg['device'],**cfg.get('evaluation',{}))
             summaries[name]=evaluation
             status['stages'].append({'name':name,'status':'PASS','checkpoint':f'{name}/best.pt'})
             write_json(out/'status.json',status)
-        make_demo(dataset,out/'dggt_world/best.pt',out/'demo',device=cfg['device'])
+        make_demo(dataset,out/experiments[0][0]/'best.pt',out/'demo',device=cfg['device'])
         status.update({'status':'COMPLETED','active_stage':None})
         write_json(out/'comparison.json',summaries)
         write_json(out/'status.json',status)

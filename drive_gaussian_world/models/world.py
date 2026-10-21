@@ -43,6 +43,10 @@ class GaussianWorldModel(nn.Module):
             token=(token*mask[:,i,:,None]).sum(1)/mask[:,i].sum(1,keepdim=True).clamp_min(1)
             if not self.use_geometry:token=torch.zeros_like(token)
             h=self.observer(torch.cat([image,token,speed[:,i,None]/20],-1),h)
+        return self.scene_state(observation,h)
+
+    def scene_state(self,observation,h):
+        rgb,tokens,mask,speed=[observation[k] for k in ('rgb','tokens','mask','speed')]
         last_tokens=tokens[:,-1]
         last_mask=mask[:,-1].float()
         if not self.use_geometry:
@@ -53,6 +57,22 @@ class GaussianWorldModel(nn.Module):
             last_mask=torch.zeros_like(last_mask)
         return {'hidden':h,'rgb':rgb[:,-1],'tokens':last_tokens,
                 'mask':last_mask,'speed':speed[:,-1]}
+    def decode_step(self,h,image,tokens,speed,a,delta):
+        prior,speed,ego=warp_gaussians(tokens,speed,a,delta)
+        # Shared residual head; inference rollout never re-encodes predicted RGB as observations.
+        image=(image+0.15*torch.tanh(self.image_decoder(h))).clamp(0,1)
+        emb=self.slots.weight[None].expand(h.shape[0],-1,-1)
+        raw=self.gaussian_decoder(torch.cat([h[:,None].expand(-1,64,-1),emb,prior],-1))
+        xyz=prior[:,:,:3]+0.1*torch.tanh(raw[:,:,:3])
+        xyz=torch.cat([xyz[:,:,:2],xyz[:,:,2:].clamp_min(0.025)],-1)
+        features=(prior[:,:,3:7]+0.1*torch.tanh(raw[:,:,3:7])).clamp(0,1)
+        scales=(prior[:,:,7:10]+0.01*torch.tanh(raw[:,:,7:10])).clamp_min(1e-5)
+        quat=F.normalize(prior[:,:,10:14]+0.1*raw[:,:,10:14],dim=-1)
+        dynamic=(prior[:,:,14:16]+0.1*torch.tanh(raw[:,:,14:16])).clamp(0,1)
+        tokens=torch.cat([xyz,features,scales,quat,dynamic],-1)
+        ego=ego+torch.tanh(self.ego_decoder(h))*ego.new_tensor([1.,1.,0.1])
+        return image,tokens,raw[:,:,16],ego,speed
+
     def rollout(self,state,actions,dt):
         if actions.ndim!=3 or actions.shape[-1]!=2 or dt.shape!=actions.shape[:2]:
             raise ValueError('scenario must have actions [B,H,2], dt [B,H]')
@@ -61,24 +81,15 @@ class GaussianWorldModel(nn.Module):
         for i in range(actions.shape[1]):
             a=actions[:,i];delta=dt[:,i]
             h=self.dynamics(torch.cat([a[:,:1]/5,a[:,1:2],delta[:,None],speed[:,None]/20],-1),h)
-            prior,speed,ego=warp_gaussians(tokens,speed,a,delta)
-            # Residual RGB decoder is open-loop; predicted images never become observations.
-            image=(image+0.15*torch.tanh(self.image_decoder(h))).clamp(0,1)
-            emb=self.slots.weight[None].expand(h.shape[0],-1,-1)
-            raw=self.gaussian_decoder(torch.cat([h[:,None].expand(-1,64,-1),emb,prior],-1))
-            xyz=prior[:,:,:3]+0.1*torch.tanh(raw[:,:,:3])
-            xyz=torch.cat([xyz[:,:,:2],xyz[:,:,2:].clamp_min(0.025)],-1)
-            features=(prior[:,:,3:7]+0.1*torch.tanh(raw[:,:,3:7])).clamp(0,1)
-            scales=(prior[:,:,7:10]+0.01*torch.tanh(raw[:,:,7:10])).clamp_min(1e-5)
-            quat=F.normalize(prior[:,:,10:14]+0.1*raw[:,:,10:14],dim=-1)
-            dynamic=(prior[:,:,14:16]+0.1*torch.tanh(raw[:,:,14:16])).clamp(0,1)
-            tokens=torch.cat([xyz,features,scales,quat,dynamic],-1)
-            ego=ego+torch.tanh(self.ego_decoder(h))*ego.new_tensor([1.,1.,0.1])
-            rgb.append(image);gaussian.append(tokens);masks.append(raw[:,:,16]);egos.append(ego)
+            image,tokens,mask,ego,speed=self.decode_step(h,image,tokens,speed,a,delta)
+            rgb.append(image);gaussian.append(tokens);masks.append(mask);egos.append(ego)
         return {'rgb':torch.stack(rgb,1),'tokens':torch.stack(gaussian,1),
                 'mask_logits':torch.stack(masks,1),'ego':torch.stack(egos,1)}
     def forward(self,observation,actions,dt):
         return self.rollout(self.observe(observation),actions,dt)
+
+    def training_loss(self,observation,actions,dt,target):
+        return world_loss(self(observation,actions,dt),target)
 
 def world_loss(pred,target):
     valid=target['mask'].float();denom=valid.sum().clamp_min(1)

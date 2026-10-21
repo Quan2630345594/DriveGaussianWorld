@@ -42,16 +42,23 @@ def transition_labels(position,yaw,speed,ts):
     ego=np.stack([forward,left,dyaw],-1)
     return actions.astype(np.float32),ego.astype(np.float32),dt.astype(np.float32)
 
-def prepare(raw,output,stride=4,frames=128):
+def prepare(raw,output,stride=4,frames=128,all_collected=False):
     if stride<1 or frames<32:raise ValueError('invalid sample budget')
     raw=Path(raw);output=fresh_dir(output)
-    k,baseline=calibration(raw/DATE/'calib_cam_to_cam.txt')
+    jobs=[{'date':DATE,'drive':drive,'split':split,'frame_ids':list(range(0,frames,stride))} for split,drive in DRIVES.items()]
+    if all_collected:
+        collection=read_json(raw.parent/'collection.json')
+        jobs=collection['episodes']
     episodes=[]
-    for split,drive in DRIVES.items():
-        scene=f'{DATE}_drive_{drive}_sync';base=raw/DATE/scene
-        candidates=[p for p in sorted((base/'image_02/data').glob('*.png')) if int(p.stem)<frames and int(p.stem)%stride==0]
+    for job in jobs:
+        date,drive,split=job['date'],job['drive'],job['split']
+        k,baseline=calibration(raw/date/'calib_cam_to_cam.txt')
+        scene=f'{date}_drive_{drive}_sync';base=raw/date/scene
+        expected=job['frame_ids'][::stride] if all_collected else job['frame_ids']
+        expected_set=set(expected)
+        candidates=[p for p in sorted((base/'image_02/data').glob('*.png')) if int(p.stem) in expected_set]
         ids=np.array([int(p.stem) for p in candidates])
-        if ids.tolist()!=list(range(0,frames,stride)):
+        if ids.tolist()!=expected:
             raise ValueError(f'incomplete source transfer/collection: {scene}; expected all selected frames')
         if len(ids)<8:raise ValueError(f'not enough synchronized frames: {scene}')
         image_times=timestamps(base/'image_02/timestamps.txt')
@@ -102,6 +109,6 @@ def prepare(raw,output,stride=4,frames=128):
 def main():
     p=argparse.ArgumentParser();p.add_argument('--raw',default='data/kitti/raw')
     p.add_argument('--output',required=True);p.add_argument('--stride',type=int,default=4)
-    p.add_argument('--frames',type=int,default=128);a=p.parse_args()
-    print(prepare(a.raw,a.output,a.stride,a.frames))
+    p.add_argument('--frames',type=int,default=128);p.add_argument('--all-collected',action='store_true');a=p.parse_args()
+    print(prepare(a.raw,a.output,a.stride,a.frames,a.all_collected))
 if __name__=='__main__':main()

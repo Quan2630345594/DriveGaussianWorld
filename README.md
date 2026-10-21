@@ -38,7 +38,7 @@ flowchart LR
     E --> H[历史 GRU 潜状态]
     Q --> H
     V[历史自车速度] --> H
-    H --> D[动作条件 GRU 动力学]
+    H --> D[GRU / RSSM / 条件 Diffusion]
     U[动作条件与时间间隔] --> D
     D --> P[解析运动先验与学习残差]
     P --> I[未来 RGB]
@@ -56,7 +56,7 @@ flowchart LR
 
 ### Gaussian 世界模型
 
-世界模型由三部分组成：
+世界模型支持 `gru`、`rssm` 和 `diffusion` 三个后端，共用输入契约、运动先验和预测头。以下三部分描述原始 GRU 基线：
 
 1. **观测编码**：CNN 将 `3×32×96` RGB 编码为 64 维向量；共享 MLP 与 masked mean 将 `64×16` Gaussian 集合编码为 48 维向量，再与速度拼接输入历史 GRU。
 2. **动作条件递推**：动力学 GRU 每步接收 `[a/5, yaw_rate, dt, speed/20]`，递归更新潜状态。解析平面运动将上一时刻 Gaussian 变换到下一相机局部系，网络预测几何、属性、有效采样 mask 和自车运动残差。
@@ -70,12 +70,14 @@ L = L_rgb + 2 L_geometry + 0.2 L_attributes + 0.05 L_mask + 0.1 L_ego
 
 其中几何项使用双向最近邻集合距离，属性项包含固定采样槽属性误差与四元数符号不变项；检查点仅由验证集损失选择。默认历史 3 帧、预测 4 步，潜状态维度与预测长度可配置；当前图像解码分辨率和 Gaussian 槽位数固定。
 
+RSSM 增加连续随机潜状态、先验/后验和 balanced KL；条件 Diffusion 使用潜空间加噪训练与 DDIM 采样。新增后端目前完成框架与小张量测试，尚未进行数据集性能或 GPU 资源比较。架构、损失和实验限制见 [三类世界模型说明](docs/WORLD_MODEL_BACKENDS.md)。
+
 ## 技术文档
 
 | 模块 | 文档 | 内容 |
 |---|---|---|
 | DGGT 前端 | [DGGT 前端技术设计](docs/DGGT_Frontend.docx) | 原生网络结构、深度反投影、坐标转换、因果缓存、尺度锚定与状态契约 |
-| 世界模型 | [Gaussian 世界模型技术设计](docs/World_Model.docx) | 编码器、递归动力学、运动先验、解码器、损失函数、GPU 执行与评估协议 |
+| 世界模型 | [Gaussian 世界模型技术设计](docs/World_Model.docx) | 原始 GRU 基线、共享编码/解码、运动先验与损失；新增后端见三类世界模型说明 |
 
 ## 安装
 
@@ -132,6 +134,23 @@ python -m drive_gaussian_world audit \
 
 输出目录须为新目录，防止覆盖已有实验。初始采集配置是工程示例；扩大数据时需调整日志清单、时间区间及划分，并重新生成对应缓存。数据来源、许可和划分限制见 [数据卡](docs/DATA_CARD.md)。
 
+### 扩展行车数据与代理
+
+`download-drives` 按 `configs/data/kitti_driving.json` 下载更多完整行车日志，保留彩色双目、OXTS、时间戳、标定和 LiDAR。按日志划分 train/val/test，先抽查行驶速度；下载前检查源 ZIP 总量及保守磁盘峰值，均低于 50GB。已校验解压的临时 ZIP 会删除，原始传感器文件保留；支持断点续传和逐文件 CRC32/SHA256。
+
+```bash
+# 先查看实际文件大小与预算；只读取元数据和少量 OXTS。
+python -m drive_gaussian_world download-drives --preflight --root data/kitti_driving
+python -m drive_gaussian_world download-drives --root data/kitti_driving
+
+# 后续准备全部日志的训练窗口；此步骤会计算双目参考几何。
+python -m drive_gaussian_world prepare --raw data/kitti_driving/raw \
+  --all-collected --stride 4 --output data/processed/kitti_driving_stereo
+```
+
+需要代理时，可在本机运行 `ssh -N -R 127.0.0.1:17892:127.0.0.1:7890 <server>`，在服务器显式设置 `DGW_HTTP_PROXY=http://127.0.0.1:17892`。转发只监听服务器回环地址；端口被占用时选择其他空闲端口。默认忽略其他 shell 代理变量，可直接访问官方 S3。代码和 CI 使用 CUDA 版 PyTorch；在没有 GPU 任务配额时仍可显式选择 `--device cpu` 做小型验证，无需安装 CPU 专用发行版。
+
+
 ## 训练与评估
 
 ### 训练世界模型
@@ -144,6 +163,29 @@ python -m drive_gaussian_world train \
 ```
 
 默认设备为 `cuda`；可指定 `cuda:N`，或使用 `--device auto` 自动选择设备。没有可用 CUDA 时，默认路径明确报错；本地调试可显式传入 `--device cpu --precision fp32`。FP16 使用梯度缩放，BF16 需硬件支持；显存占用取决于 DGGT 分辨率、历史长度和训练批大小。
+
+### 切换动力学后端
+
+训练命令增加 `--backend gru|rssm|diffusion`，默认保持 `gru`，旧检查点兼容加载。
+
+```bash
+# RSSM：连续随机潜状态与先验/后验训练
+python -m drive_gaussian_world train \
+  --dataset data/processed/kitti_dggt --output runs/rssm \
+  --backend rssm --model-options '{"stochastic":32,"kl_weight":0.1}' --device cuda:0
+
+# Diffusion：潜空间噪声预测训练，20 步 DDIM 采样
+python -m drive_gaussian_world train \
+  --dataset data/processed/kitti_dggt --output runs/diffusion \
+  --backend diffusion --model-options '{"diffusion_steps":100,"sampling_steps":20}' --device cuda:0
+
+# 数据与算力就绪后，使用同一份缓存运行三个后端
+python -m drive_gaussian_world experiments \
+  --dataset data/processed/kitti_dggt --config configs/comparison.json \
+  --output runs/model_comparison
+```
+
+单后端配置位于 `configs/world_models/`；评估、Demo 和 API 根据检查点自动选择后端。评估时添加 `--samples 5 --seed 42` 可输出平均样本 ADE、best-of-K ADE 和轨迹离散度。RSSM 当前只实现世界模型，不包含 Dreamer actor/critic；Diffusion 当前使用联合学习的紧凑场景编码器。相同隐藏维度与训练步数不代表相同计算预算，后续比较需补充多种子和显存/延迟测量。
 
 ### 评估与消融
 

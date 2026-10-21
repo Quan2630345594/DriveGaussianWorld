@@ -12,12 +12,12 @@ import zlib
 import hashlib
 import requests
 from drive_gaussian_world.common import write_json,sha256
-from drive_gaussian_world.data.collect import HOST,DATE,DRIVES,fetch,extract
+from drive_gaussian_world.data.collect import HOST,DATE,DRIVES,fetch,extract,download_session
 
 _LOCAL=threading.local()
 def session():
     if not hasattr(_LOCAL,'session'):
-        _LOCAL.session=requests.Session();_LOCAL.session.trust_env=False
+        _LOCAL.session=download_session()
     return _LOCAL.session
 
 def get_range(url,start,end):
@@ -74,8 +74,9 @@ def member(url,info,root):
     return {'path':str(p),'bytes':len(content),'sha256':hashlib.sha256(content).hexdigest(),'crc32':info.CRC,
             'compressed_bytes':info.compress_size}
 
-def collect(root,frames=128,stride=4,workers=6):
+def collect(root,frames=128,stride=4,workers=6,max_bytes=49_000_000_000):
     if not 32<=frames<=300 or stride<1 or not 1<=workers<=8:raise ValueError('invalid collection budget')
+    if not 1_000_000<=max_bytes<50_000_000_000:raise ValueError('collection limit must be at least 1 MB and below 50 GB')
     root=Path(root);root.mkdir(parents=True,exist_ok=True)
     calib=fetch(HOST+DATE+'_calib.zip',root/'archives'/f'{DATE}_calib.zip')
     cm=extract(calib,root/'raw',frames)
@@ -96,6 +97,9 @@ def collect(root,frames=128,stride=4,workers=6):
                 # A few real LiDAR frames are collected for diagnostic projection, not world-model inputs.
                 keep=keep or ('velodyne_points' in p.parts and fid in [0,stride,2*stride])
             if keep:selected.append(info)
+        existing=sum(p.stat().st_size for p in root.rglob('*') if p.is_file())
+        additional=sum(i.file_size for i in selected if not (root/'raw'/i.filename).exists())
+        if existing+additional>max_bytes:raise ValueError('collection exceeds total disk byte budget')
         # Inspect real OXTS before fetching images: a road dataset can contain stationary intervals.
         motion_infos=[i for i in selected if '/oxts/data/' in i.filename]
         with ThreadPoolExecutor(max_workers=workers) as pool:
@@ -115,7 +119,7 @@ def collect(root,frames=128,stride=4,workers=6):
             'source':'https://www.cvlibs.net/datasets/kitti/raw_data.php',
             'license':'CC BY-NC-SA 3.0; research/non-commercial; retain KITTI attribution',
             'license_url':'https://www.cvlibs.net/datasets/kitti/','frame_limit':frames,'source_stride':stride,
-            'drives':DRIVES,'method':'public S3 ZIP ranges, CRC32 + per-member SHA256',
+            'max_bytes':max_bytes,'drives':DRIVES,'method':'public S3 ZIP ranges, CRC32 + per-member SHA256',
             'archives':archives,'selected_compressed_bytes':sum(a.get('selected_compressed_bytes',0) for a in archives),
             'notes':['Whole-log splits, possible geographical overlap; engineering subset only.',
                      'Motion-derived conditioning labels are not issued throttle/steering controls.']}
@@ -125,7 +129,7 @@ def collect(root,frames=128,stride=4,workers=6):
 def main():
     p=argparse.ArgumentParser();p.add_argument('--root',default='data/kitti')
     p.add_argument('--frames',type=int,default=128);p.add_argument('--stride',type=int,default=4)
-    p.add_argument('--workers',type=int,default=6);a=p.parse_args()
-    m=collect(a.root,a.frames,a.stride,a.workers)
+    p.add_argument('--workers',type=int,default=6);p.add_argument('--max-bytes',type=int,default=49_000_000_000);a=p.parse_args()
+    m=collect(a.root,a.frames,a.stride,a.workers,a.max_bytes)
     print('COLLECTED_BYTES',m['selected_compressed_bytes'])
 if __name__=='__main__':main()

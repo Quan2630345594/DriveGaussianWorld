@@ -54,8 +54,9 @@ def scores(pred,target):
             'gaussian_chamfer_m':chamfer,'surface_mask_iou':coverage,
             **{f'psnr_step_{i+1}_db':psnr[:,i].tolist() for i in range(psnr.shape[1])}}
 
-def evaluate(dataset,checkpoint,output,split='test',batch_size=4,threads=2,device='cuda'):
-    selected=configure_runtime(42,threads,device)
+def evaluate(dataset,checkpoint,output,split='test',batch_size=4,threads=2,device='cuda',samples=1,seed=42):
+    if samples<1:raise ValueError('samples must be positive')
+    selected=configure_runtime(seed,threads,device)
     import torch
     from torch.utils.data import DataLoader
     from drive_gaussian_world.data.windows import DrivingWindows
@@ -65,6 +66,7 @@ def evaluate(dataset,checkpoint,output,split='test',batch_size=4,threads=2,devic
         raise ValueError('checkpoint dataset provenance mismatch')
     ds=DrivingWindows(dataset,split,cfg['history'],cfg['horizon'])
     results={name:{} for name in ['learned_logged_motion','learned_current_motion','persistence','action_warp','constant_speed']}
+    stochastic={}
     with torch.inference_mode():
         for batch in DataLoader(ds,batch_size=batch_size,shuffle=False,num_workers=0):
             batch=move_to(batch,selected)
@@ -75,6 +77,13 @@ def evaluate(dataset,checkpoint,output,split='test',batch_size=4,threads=2,devic
             # An available-now scenario uses zero acceleration and yaw rate estimated from history is unavailable
             # in this observation contract; keep a straight constant-speed condition, with no target-derived action.
             current=model.rollout(state,torch.zeros_like(actions),dt)
+            if samples>1:
+                candidates=[logged]+[model(batch['observation'],used,dt) for _ in range(samples-1)]
+                errors=torch.stack([torch.linalg.vector_norm(trajectory(p['ego'])-trajectory(batch['target']['ego']),dim=-1).mean(1) for p in candidates])
+                xy=torch.stack([trajectory(p['ego']) for p in candidates])
+                values={'mean_sample_ade_m':errors.mean(0).tolist(),'best_of_k_ade_m':errors.min(0).values.tolist(),
+                        'trajectory_std_m':xy.std(0,unbiased=False).norm(dim=-1).mean(1).tolist()}
+                for key,value in values.items():stochastic.setdefault(key,[]).extend(value)
             available_now={'observation':batch['observation'],
                            'condition':{'actions':torch.zeros_like(actions),'dt':dt}}
             predictions={'learned_logged_motion':logged,'learned_current_motion':current,
@@ -83,7 +92,8 @@ def evaluate(dataset,checkpoint,output,split='test',batch_size=4,threads=2,devic
             for name,pred in predictions.items():
                 for key,value in scores(pred,batch['target']).items():results[name].setdefault(key,[]).extend(value)
     summary={name:{k:float(np.mean(v)) for k,v in values.items()} for name,values in results.items()}
-    report={'schema_version':1,'device':str(selected),'split':split,'windows':len(ds),'scene_ids':[e['scene_id'] for e,a in ds.episodes],
+    report={'schema_version':2,'backend':cfg.get('backend','gru'),'sampling':{'count':samples,'seed':seed,'model_options':cfg.get('model_options',{})},
+        'stochastic_metrics':{k:float(np.mean(v)) for k,v in stochastic.items()},'device':str(selected),'split':split,'windows':len(ds),'scene_ids':[e['scene_id'] for e,a in ds.episodes],
         'metrics':summary,'checkpoint_sha256':sha256(checkpoint),'dataset_sha256':ckpt['dataset_sha256'],
         'ablation':{'no_geometry':cfg['no_geometry'],'no_actions':cfg['no_actions']},
         'conditioning':{'learned_logged_motion':'Future motion-derived labels supplied as scenario; conditional prediction, not autonomous forecasting.',
@@ -91,7 +101,7 @@ def evaluate(dataset,checkpoint,output,split='test',batch_size=4,threads=2,devic
                         'action_warp':'Analytic ego and Gaussian rigid-motion baseline, supplied logged motion.',
                         'constant_speed':'No future action labels; zero acceleration/yaw analytic ego and geometry, last image.',
                         'persistence':'Last image/surfaces; analytic ego using supplied logged motion.'},
-        'limitations':['Only one held-out KITTI drive; windows overlap and are correlated.',
+        'limitations':['Held-out windows overlap and are correlated; see scene_ids for the evaluated drives.',
                       'Gaussian metrics compare DGGT/stereo pseudo-geometry, not independent 3D ground truth.',
                       'No closed-loop driving, occupancy truth, safety or benchmark claim.']}
     write_json(output,report);return report
@@ -99,6 +109,7 @@ def evaluate(dataset,checkpoint,output,split='test',batch_size=4,threads=2,devic
 def main():
     p=argparse.ArgumentParser();p.add_argument('--dataset',required=True);p.add_argument('--checkpoint',required=True)
     p.add_argument('--output',required=True);p.add_argument('--split',choices=['train','val','test'],default='test')
+    p.add_argument('--samples',type=int,default=1);p.add_argument('--seed',type=int,default=42)
     p.add_argument('--device',default='cuda');p.add_argument('--batch-size',type=int,default=4);p.add_argument('--threads',type=int,default=2)
     print(evaluate(**vars(p.parse_args())))
 if __name__=='__main__':main()
