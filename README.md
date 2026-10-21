@@ -4,7 +4,7 @@
 
 ### Geometry Grounded World Modeling for Autonomous Driving
 
-[![Tests](https://github.com/Quan2630345594/GaussianParkWorld/actions/workflows/tests.yml/badge.svg)](https://github.com/Quan2630345594/GaussianParkWorld/actions/workflows/tests.yml)
+[![Tests](https://github.com/Quan2630345594/DriveGaussianWorld/actions/workflows/tests.yml/badge.svg)](https://github.com/Quan2630345594/DriveGaussianWorld/actions/workflows/tests.yml)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.4-orange)
 ![CUDA](https://img.shields.io/badge/CUDA-supported-76B900)
@@ -35,7 +35,7 @@ flowchart LR
     M --> G[Gaussian 状态与有效采样 Mask]
     A --> E[图像编码器]
     G --> Q[Gaussian 集合编码器]
-    E --> H[历史 GRU 潜状态]
+    E --> H[历史场景状态]
     Q --> H
     V[历史自车速度] --> H
     H --> D[GRU / RSSM / 条件 Diffusion]
@@ -77,14 +77,14 @@ RSSM 增加连续随机潜状态、先验/后验和 balanced KL；条件 Diffusi
 | 模块 | 文档 | 内容 |
 |---|---|---|
 | DGGT 前端 | [DGGT 前端技术设计](docs/DGGT_Frontend.docx) | 原生网络结构、深度反投影、坐标转换、因果缓存、尺度锚定与状态契约 |
-| 世界模型 | [Gaussian 世界模型技术设计](docs/World_Model.docx) | 原始 GRU 基线、共享编码/解码、运动先验与损失；新增后端见三类世界模型说明 |
+| 世界模型 | [Gaussian 世界模型技术设计](docs/World_Model.docx) | GRU、RSSM 与条件 Diffusion 结构、共享预测头、训练目标和比较协议 |
 
 ## 安装
 
 ### 1 创建环境
 
 ```bash
-git clone --recurse-submodules https://github.com/Quan2630345594/GaussianParkWorld.git DriveGaussianWorld
+git clone --recurse-submodules https://github.com/Quan2630345594/DriveGaussianWorld.git DriveGaussianWorld
 cd DriveGaussianWorld
 conda create -n drivegaussianworld python=3.10 -y
 conda activate drivegaussianworld
@@ -148,7 +148,7 @@ python -m drive_gaussian_world prepare --raw data/kitti_driving/raw \
   --all-collected --stride 4 --output data/processed/kitti_driving_stereo
 ```
 
-需要代理时，可在本机运行 `ssh -N -R 127.0.0.1:17892:127.0.0.1:7890 <server>`，在服务器显式设置 `DGW_HTTP_PROXY=http://127.0.0.1:17892`。转发只监听服务器回环地址；端口被占用时选择其他空闲端口。默认忽略其他 shell 代理变量，可直接访问官方 S3。代码和 CI 使用 CUDA 版 PyTorch；在没有 GPU 任务配额时仍可显式选择 `--device cpu` 做小型验证，无需安装 CPU 专用发行版。
+需要代理时，可在本机运行 `ssh -N -R 127.0.0.1:17892:127.0.0.1:7890 <server>`，在服务器显式设置 `DGW_HTTP_PROXY=http://127.0.0.1:17892`。转发只监听服务器回环地址；端口被占用时选择其他空闲端口。默认忽略其他 shell 代理变量，可直接访问官方 S3。`DGW_TRANSFER_WORKERS=16` 可调整每条日志的分块并发数，允许范围为 1 到 32；最多同时处理两条日志。代码和 CI 使用 CUDA 版 PyTorch；在没有 GPU 任务配额时仍可显式选择 `--device cpu` 做小型验证，无需安装 CPU 专用发行版。
 
 
 ## 训练与评估

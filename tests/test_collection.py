@@ -163,3 +163,15 @@ def test_range_resume_after_interrupted_assembly(tmp_path,monkeypatch):
     monkeypatch.setattr(dd,'download_session',Session)
     assert dd.fetch_parallel('https://official.example/drive.zip',path,12,block_bytes=4,workers=2).read_bytes()==payload
     assert not cache.exists()
+
+
+def test_transfer_worker_configuration(tmp_path,monkeypatch):
+    import drive_gaussian_world.data.download_drives as dd
+    captured=[]
+    def fake(url,path,expected_bytes,workers):captured.append(workers);return path
+    monkeypatch.setattr(dd,'fetch_parallel',fake)
+    monkeypatch.setenv('DGW_TRANSFER_WORKERS','16')
+    path=tmp_path/'drive.zip';assert dd.fetch_resume('https://official.example/x',path,100_000_000)==path
+    assert captured==[16]
+    monkeypatch.setenv('DGW_TRANSFER_WORKERS','33')
+    with pytest.raises(ValueError,match='within'):dd.fetch_resume('https://official.example/x',path,100_000_000)

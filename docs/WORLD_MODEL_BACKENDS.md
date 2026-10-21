@@ -2,7 +2,7 @@
 
 DriveGaussianWorld supports three interchangeable dynamics backends. All consume historical RGB, DGGT Gaussian tokens, valid-slot masks and speed, plus separately supplied future motion conditions. Outputs are RGB `[B,F,3,32,96]`, Gaussian tokens `[B,F,64,16]`, mask logits `[B,F,64]` and local ego increments `[B,F,3]`.
 
-These implementations are research frameworks. No trained RSSM/diffusion quality or GPU resource comparison is claimed. The existing `World_Model.docx` describes the original GRU baseline and shared heads; this document describes the new backends.
+These implementations are research frameworks. No trained RSSM/diffusion quality or GPU resource comparison is claimed. `World_Model.docx` covers the shared heads and all three backend designs; this document provides the code-facing configuration and protocol reference.
 
 ## Shared interface
 
@@ -115,7 +115,7 @@ Reports include parameter count, synchronized mean/median inference latency, thr
 
 ## Framework validation
 
-On 2026-10-21, the server's Python 3.10 / PyTorch 2.4.1+cu124 environment passed 53 tests. These cover causal inference boundaries, backend gradients, seeded sampling, action response, old/new checkpoints, one-step fixture training, evaluation/demo/API integration, deferred profiler contracts, dataset byte budgets, CRC/SHA recording and interrupted download recovery. Tests use small tensors without GPU execution. No large training, DGGT rerun or CUDA memory/latency benchmark was performed.
+On 2026-10-21, the server's Python 3.10 / PyTorch 2.4.1+cu124 environment passed 54 tests. These cover causal inference boundaries, backend gradients, seeded sampling, action response, old/new checkpoints, one-step fixture training, evaluation/demo/API integration, deferred profiler contracts, dataset byte budgets, CRC/SHA recording and interrupted download recovery. Tests use small tensors without GPU execution. No large training, DGGT rerun or CUDA memory/latency benchmark was performed.
 
 ## References
 

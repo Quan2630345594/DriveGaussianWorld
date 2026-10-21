@@ -1,6 +1,7 @@
 """Download a bounded multi-drive KITTI subset; retain raw sensors, discard verified ZIPs."""
 from __future__ import annotations
 import argparse
+import os
 from concurrent.futures import ThreadPoolExecutor,as_completed
 from pathlib import Path
 import time
@@ -154,7 +155,9 @@ def fetch_parallel(url,path,expected_bytes,block_bytes=8*1024*1024,workers=8):
 
 
 def fetch_resume(url,path,expected_bytes):
-    if expected_bytes>64*1024*1024:return fetch_parallel(url,path,expected_bytes)
+    workers=int(os.environ.get('DGW_TRANSFER_WORKERS','8'))
+    if not 1<=workers<=32:raise ValueError('DGW_TRANSFER_WORKERS must be within 1..32')
+    if expected_bytes>64*1024*1024:return fetch_parallel(url,path,expected_bytes,workers=workers)
     return _fetch_stream(url,path,expected_bytes)
 
 
