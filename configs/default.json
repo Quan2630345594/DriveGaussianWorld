@@ -3,6 +3,18 @@
   "precision": "fp32",
   "threads": 4,
   "seed": 42,
-  "model": {"history": 3, "horizon": 4, "hidden": 96},
-  "training": {"steps": 20000, "batch_size": 32, "lr": 0.0003}
+  "model": {
+    "history": 4,
+    "horizon": 8,
+    "hidden": 256,
+    "backend": "rssm",
+    "model_options": {
+      "stochastic": 64
+    }
+  },
+  "training": {
+    "steps": 20000,
+    "batch_size": 8,
+    "lr": 0.0003
+  }
 }

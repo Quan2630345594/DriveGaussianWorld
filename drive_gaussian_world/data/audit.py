@@ -63,9 +63,9 @@ def lidar_diagnostic(dataset,raw):
                         'patch_depth_abs_rel':float(np.mean(rels)) if rels else None,'frames':frames})
     return {'status':'DIAGNOSTIC_ONLY','episodes':reports,
             'interpretation':'Independent LiDAR depth in sparse image patches, not dense benchmark depth or occupancy.',
-            'limitations':['Only three LiDAR frames per drive; patch medians can mix occlusion layers.',
+            'limitations':['LiDAR support depends on the collection; patch medians can mix occlusion layers.',
                           'DGGT uses stereo scale anchoring; camera intrinsics/pose remain predicted.',
-                          'Camera/IMU reference points and local frames are approximate in the CPU dynamics prior.']}
+                          'Camera/IMU reference points and local frames are approximate in the dynamics prior.']}
 
 def main():
     p=argparse.ArgumentParser();p.add_argument('--root',default='data/kitti');p.add_argument('--dataset')

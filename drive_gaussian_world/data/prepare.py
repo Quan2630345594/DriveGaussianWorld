@@ -5,7 +5,7 @@ import numpy as np
 from PIL import Image
 from drive_gaussian_world.common import fresh_dir,write_json,sha256,read_json
 from drive_gaussian_world.data.collect import DATE,DRIVES
-from drive_gaussian_world.data.schema import TOKEN_FIELDS,validate_dataset
+from drive_gaussian_world.data.schema import TOKEN_FIELDS,validate_dataset,validate_episode
 from drive_gaussian_world.geometry.stereo import stereo_tokens
 
 def calibration(path):
@@ -42,9 +42,14 @@ def transition_labels(position,yaw,speed,ts):
     ego=np.stack([forward,left,dyaw],-1)
     return actions.astype(np.float32),ego.astype(np.float32),dt.astype(np.float32)
 
-def prepare(raw,output,stride=4,frames=128,all_collected=False):
+def prepare(raw,output,stride=4,frames=128,all_collected=False,resume=False,threads=2):
     if stride<1 or frames<32:raise ValueError('invalid sample budget')
-    raw=Path(raw);output=fresh_dir(output)
+    import cv2
+    if threads<1:raise ValueError('threads must be positive')
+    cv2.setNumThreads(threads)
+    raw=Path(raw);output=Path(output)
+    if resume:output.mkdir(parents=True,exist_ok=True)
+    else:output=fresh_dir(output)
     jobs=[{'date':DATE,'drive':drive,'split':split,'frame_ids':list(range(0,frames,stride))} for split,drive in DRIVES.items()]
     if all_collected:
         collection=read_json(raw.parent/'collection.json')
@@ -71,6 +76,19 @@ def prepare(raw,output,stride=4,frames=128,all_collected=False):
             absolutes.append(a[ids])
         for a in absolutes[1:]:
             if np.max(np.abs(a-absolutes[0]))>50_000_000:raise ValueError('sensor time misalignment >50 ms')
+        cached=output/f'{scene}.npz';sources_path=output/f'{scene}.sources.json'
+        if resume and cached.exists() and sources_path.exists():
+            metadata=read_json(sources_path)
+            with np.load(cached,allow_pickle=False) as existing:
+                matching=np.array_equal(existing['frame_ids'],ids)
+            sources=metadata['frames']
+            if matching and len(sources)==len(ids) and all(
+                sha256(raw/f['left'])==f['left_sha256'] and sha256(raw/f['left'].replace('image_02/','image_03/'))==f['right_sha256'] for f in sources):
+                validate_episode(cached)
+                episodes.append({'scene_id':scene,'split':split,'path':cached.name,
+                    'sha256':sha256(cached),'geometry_source':'stereo_sgbm_reference','sources':sources_path.name})
+                print(f'resumed {split}: {scene}, {len(ids)} frames',flush=True)
+                continue
         measurements=np.stack([np.loadtxt(base/'oxts/data'/f'{i:010d}.txt') for i in ids])
         ts=image_times[ids];ts-=ts[0]
         pos=oxts_position(measurements);yaw=measurements[:,5];speed=measurements[:,8]
@@ -109,6 +127,7 @@ def prepare(raw,output,stride=4,frames=128,all_collected=False):
 def main():
     p=argparse.ArgumentParser();p.add_argument('--raw',default='data/kitti/raw')
     p.add_argument('--output',required=True);p.add_argument('--stride',type=int,default=4)
-    p.add_argument('--frames',type=int,default=128);p.add_argument('--all-collected',action='store_true');a=p.parse_args()
-    print(prepare(a.raw,a.output,a.stride,a.frames,a.all_collected))
+    p.add_argument('--frames',type=int,default=128);p.add_argument('--all-collected',action='store_true')
+    p.add_argument('--resume',action='store_true');p.add_argument('--threads',type=int,default=2)
+    a=p.parse_args();print(prepare(**vars(a)))
 if __name__=='__main__':main()

@@ -22,7 +22,6 @@ def make_demo(dataset,checkpoint,output,split='test',window=0,device='cuda'):
     from drive_gaussian_world.data.windows import DrivingWindows
     from drive_gaussian_world.train import load_model
     from drive_gaussian_world.evaluate import baseline,trajectory,evaluate
-    from drive_gaussian_world.planning.counterfactual import rank_maneuvers
     out=fresh_dir(output);model,ckpt=load_model(checkpoint,selected);cfg=ckpt['config']
     ds=DrivingWindows(dataset,split,cfg['history'],cfg['horizon'])
     batch=move_to(default_collate([ds[window]]),selected)
@@ -31,8 +30,6 @@ def make_demo(dataset,checkpoint,output,split='test',window=0,device='cuda'):
         if cfg['no_actions']:action=torch.zeros_like(action)
         pred=model(batch['observation'],action,batch['condition']['dt'])
         ref=baseline(batch)
-    counterfactual=rank_maneuvers(model,batch['observation'],cfg['horizon'],float(batch['condition']['dt'][0,0]))
-    write_json(out/'counterfactuals.json',counterfactual)
     metrics=evaluate(dataset,checkpoint,out/'evaluation.json',split,device=selected)
     batch=to_cpu(batch);pred=to_cpu(pred);ref=to_cpu(ref)
     target=batch['target'];frames=[];payload=[]
@@ -54,7 +51,7 @@ def make_demo(dataset,checkpoint,output,split='test',window=0,device='cuda'):
     frames[0].save(out/'rollout.gif',save_all=True,append_images=frames[1:],duration=450,loop=0)
     frames[-1].save(out/'comparison.png')
     history=[png_data(x) for x in batch['observation']['rgb'][0].numpy()]
-    content={'frames':payload,'history':history,'metrics':metrics,'counterfactuals':counterfactual,
+    content={'frames':payload,'history':history,'metrics':metrics,
              'scene_id':batch['scene_id'][0],'anchor':int(batch['anchor'][0]),
              'predicted_path':trajectory(pred['ego'])[0].tolist(),'reference_path':trajectory(target['ego'])[0].tolist()}
     write_json(out/'demo_data.json',content)
@@ -66,12 +63,12 @@ body{font:15px system-ui;background:#0c1423;color:#dbe5f5;max-width:1250px;margi
 <section><h2>历史观测</h2><p id="scene"></p><div class="history" id="history"></div></section>
 <section><h2>开环未来预测</h2><p>这里的模型预测使用日志中的未来运动条件；真值未来仅用于评估。另有不提供未来运动的指标。</p><input id="step" type="range" min="0" value="0"><span id="label"></span>
 <div class="grid"><div><p>真值未来图像</p><img id="gt"></div><div><p>世界模型预测</p><img id="prediction"></div><div><p>保持末帧基线</p><img id="persistence"></div></div></section>
-<section><h2>Gaussian 表面与轨迹</h2><div class="grid"><div><p>预测 Gaussian：相机 x/z 平面</p><canvas id="surfaces" width="380" height="300"></canvas></div><div><p>多步自车轨迹：米，前向/左向</p><canvas id="path" width="380" height="300"></canvas></div><div><p class="warn">稀疏可见表面不是占据真值。轨迹与动作均是离线研究输出，不是车辆控制接口。</p><p id="candidate"></p></div></div></section>
+<section><h2>Gaussian 表面与轨迹</h2><div class="grid"><div><p>预测 Gaussian：相机 x/z 平面</p><canvas id="surfaces" width="380" height="300"></canvas></div><div><p>多步自车轨迹：米，前向/左向</p><canvas id="path" width="380" height="300"></canvas></div><div><p class="warn">稀疏可见表面不是占据真值。轨迹与动作均是离线研究输出，不是车辆控制接口。</p></div></div></section>
 <section><h2>留出日志评估</h2><div id="metrics"></div><p class="warn">日志级划分，窗口有重叠，路线可能接近；伪几何指标不能证明真实重建精度。无闭环驾驶或安全能力结论。</p></section>
 <script>const D=__DATA__;document.getElementById('scene').textContent=D.scene_id+' / anchor '+D.anchor;document.getElementById('history').innerHTML=D.history.map(x=>'<img src="'+x+'">').join('');const slider=document.getElementById('step');slider.max=D.frames.length-1;
 function line(canvas,series,colors){let c=canvas.getContext('2d');c.clearRect(0,0,380,300);series.forEach((pts,i)=>{c.beginPath();c.strokeStyle=colors[i];c.lineWidth=3;c.moveTo(40,260);pts.forEach(p=>c.lineTo(40+p[0]*12,260-p[1]*18));c.stroke()});c.fillStyle='#cbd5e1';c.fillText('cyan: predicted; yellow: reference',12,18)}
 function render(){let t=+slider.value,f=D.frames[t];['gt','prediction','persistence'].forEach(k=>document.getElementById(k).src=f[k]);document.getElementById('label').textContent=' future step '+(t+1);let c=document.getElementById('surfaces').getContext('2d');c.clearRect(0,0,380,300);f.surfaces_predicted.forEach((p,i)=>{let col=f.colors_predicted[i];c.fillStyle='rgb('+col.map(x=>Math.round(x*255)).join(',')+')';c.beginPath();c.arc(190+p[0]*6,290-p[2]*3,3,0,7);c.fill()});c.fillStyle='#cbd5e1';c.fillText('x: right (+), z: forward (+)',12,18);line(document.getElementById('path'),[D.predicted_path.slice(0,t+1),D.reference_path.slice(0,t+1)],['#67e8f9','#fde047'])}slider.oninput=render;render();
-let cols=['rgb_l1','psnr_db','ego_ade_m','ego_fde_m','gaussian_chamfer_m'];document.getElementById('metrics').innerHTML='<table><tr><th>method</th>'+cols.map(k=>'<th>'+k+'</th>').join('')+'</tr>'+Object.entries(D.metrics.metrics).map(([name,m])=>'<tr><td>'+name+'</td>'+cols.map(k=>'<td>'+m[k].toFixed(3)+'</td>').join('')+'</tr>').join('')+'</table>';document.getElementById('candidate').textContent='候选：'+D.counterfactuals.ranked.map(x=>x.maneuver+' ('+x.score.toFixed(2)+')').join('，')+'。仅展示开环排序。';</script></html>'''
+let cols=['rgb_l1','psnr_db','ego_ade_m','ego_fde_m','gaussian_chamfer_m'];document.getElementById('metrics').innerHTML='<table><tr><th>method</th>'+cols.map(k=>'<th>'+k+'</th>').join('')+'</tr>'+Object.entries(D.metrics.metrics).map(([name,m])=>'<tr><td>'+name+'</td>'+cols.map(k=>'<td>'+m[k].toFixed(3)+'</td>').join('')+'</tr>').join('')+'</table>';</script></html>'''
     (out/'report.html').write_text(template.replace('__DATA__',json.dumps(content,ensure_ascii=False).replace('</','<\\/')))
     return str(out/'report.html')
 

@@ -1,24 +1,14 @@
-# Reference Experiments
+# RSSM Pilot Results
 
-These measurements were collected on 2026-10-19 with the engineering subset: KITTI raw drives 0005 / 0013 / 0009, 32 sampled times per drive. Each split contains 26 overlapping windows. The DGGT cache used input width 140 and two observed frames; world models used history 3, horizon 4 and hidden dimension 96, with 200 optimizer steps each. These historical runs used CPU execution. They are not results of the current default CUDA configuration or a full-scale benchmark.
+On 2026-11-24, a single-GPU RSSM pilot used the existing causal DGGT cache: KITTI drives 0005 / 0013 / 0009 for train / validation / test respectively. Each log contained 32 sampled frames and 21 overlapping windows with history 4 and horizon 8. This is a small engineering pilot, not the expanded 20-log dataset or a cross-dataset experiment.
 
-## Logged motion conditions
+The model used hidden dimension 256, stochastic dimension 64, batch size 8 and 1,054,495 trainable parameters. Validation selected the checkpoint at step 150. Training stopped at step 525 after 15 validation checks without sufficient improvement, taking 34.8 seconds. PyTorch peak allocated memory was 93,521,408 bytes; this excludes driver/context overhead.
 
-| Method | RGB L1 | PSNR dB | Ego ADE m | Ego FDE m | Gaussian distance m |
-|---|---:|---:|---:|---:|---:|
-| dggt_world | 0.2302 | 10.0486 | 0.2507 | 0.3870 | 3.4907 |
-| rgb_only | 0.2278 | 10.0706 | 0.2690 | 0.4221 | 12.4786 |
-| no_actions | 0.2276 | 10.0935 | 0.2731 | 0.4661 | 3.3182 |
-| stereo_world | 0.2284 | 10.0773 | 0.2179 | 0.3526 | 4.7381 |
-| Persistence | 0.2267 | 10.0868 | 0.1819 | 0.2799 | 1.8789 |
-| Action warp | 0.2267 | 10.0868 | 0.1819 | 0.2799 | 6.0799 |
+| Method | RGB L1 | PSNR dB | Ego ADE m | Gaussian distance m |
+|---|---:|---:|---:|---:|
+| RSSM with logged motion | 0.2541 | 9.4015 | 0.6289 | 5.6876 |
+| Last-frame persistence | 0.2359 | 9.8104 | 0.3288 | 1.9317 |
 
-The learned model does not consistently outperform persistence. Gaussian targets are frontend pseudo-geometry; distances across different target backends are not direct accuracy rankings. Effective-sampling masks in this DGGT cache are nearly always valid, so an IoU of 1 is a degenerate support statistic, not evidence of occupancy or occlusion understanding.
+The learned model did not beat persistence. Its small training split and restricted decoder do not support conclusions about Dreamer architecture quality. Geometry metrics use frontend pseudo-labels. The persistence ego metric uses the analytical motion condition, not a frozen ego position. Mask IoU was 1.0 and is not an occupancy or occlusion metric.
 
-## Independent depth diagnostics
-
-The held-out log contains three selected LiDAR times. DGGT sparse patch depth MAE is 4.900 m across 135 matched patches; stereo reference MAE is 2.332 m across 99 patches. The support differs and patch medians may mix occlusion layers. These are diagnostics, not a standard dense-depth benchmark.
-
-## Current verification
-
-The device refactor is covered by numerical, causality, checkpoint, API and device-routing regression tests. Default CUDA failure is explicit when unavailable. No new large-scale GPU training was launched as part of the documentation and device refactor. Reproduce a new experiment with the current README commands and retain its actual configuration and metadata.
+Artifacts are retained outside Git under `output/rssm_pilot_20261124`: protocol, metrics, best checkpoint, test evaluation, learning curve and rollout GIF. This pilot was not repeated or tuned after viewing the held-out test result.

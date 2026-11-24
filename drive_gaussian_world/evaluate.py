@@ -92,7 +92,7 @@ def evaluate(dataset,checkpoint,output,split='test',batch_size=4,threads=2,devic
             for name,pred in predictions.items():
                 for key,value in scores(pred,batch['target']).items():results[name].setdefault(key,[]).extend(value)
     summary={name:{k:float(np.mean(v)) for k,v in values.items()} for name,values in results.items()}
-    report={'schema_version':2,'backend':cfg.get('backend','gru'),'sampling':{'count':samples,'seed':seed,'model_options':cfg.get('model_options',{})},
+    report={'schema_version':2,'backend':cfg.get('backend','rssm'),'sampling':{'count':samples,'seed':seed,'model_options':cfg.get('model_options',{})},
         'stochastic_metrics':{k:float(np.mean(v)) for k,v in stochastic.items()},'device':str(selected),'split':split,'windows':len(ds),'scene_ids':[e['scene_id'] for e,a in ds.episodes],
         'metrics':summary,'checkpoint_sha256':sha256(checkpoint),'dataset_sha256':ckpt['dataset_sha256'],
         'ablation':{'no_geometry':cfg['no_geometry'],'no_actions':cfg['no_actions']},

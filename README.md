@@ -2,7 +2,7 @@
 
 # DriveGaussianWorld
 
-### Geometry Grounded World Modeling for Autonomous Driving
+### DGGT Grounded Dreamer World Modeling for Autonomous Driving
 
 [![Tests](https://github.com/Quan2630345594/DriveGaussianWorld/actions/workflows/tests.yml/badge.svg)](https://github.com/Quan2630345594/DriveGaussianWorld/actions/workflows/tests.yml)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
@@ -38,7 +38,7 @@ flowchart LR
     E --> H[历史场景状态]
     Q --> H
     V[历史自车速度] --> H
-    H --> D[GRU / RSSM / 条件 Diffusion]
+    H --> D[Dreamer 风格 RSSM]
     U[动作条件与时间间隔] --> D
     D --> P[解析运动先验与学习残差]
     P --> I[未来 RGB]
@@ -56,28 +56,26 @@ flowchart LR
 
 ### Gaussian 世界模型
 
-世界模型支持 `gru`、`rssm` 和 `diffusion` 三个后端，共用输入契约、运动先验和预测头。以下三部分描述原始 GRU 基线：
+世界模型采用 Dreamer 风格的连续 RSSM，由确定性循环状态和随机潜状态共同描述场景。当前实现关注动作条件未来预测，不包含 actor、critic、奖励模型或在线强化学习，不能视为完整 Dreamer 复现。
 
-1. **观测编码**：CNN 将 `3×32×96` RGB 编码为 64 维向量；共享 MLP 与 masked mean 将 `64×16` Gaussian 集合编码为 48 维向量，再与速度拼接输入历史 GRU。
-2. **动作条件递推**：动力学 GRU 每步接收 `[a/5, yaw_rate, dt, speed/20]`，递归更新潜状态。解析平面运动将上一时刻 Gaussian 变换到下一相机局部系，网络预测几何、属性、有效采样 mask 和自车运动残差。
-3. **联合解码**：图像残差解码器预测未来 RGB；Gaussian 解码器预测局部场景；自车解码器预测 `[forward, left, delta_yaw]`。开环 rollout 不读取未来观测，也不使用 teacher forcing。
-
-训练目标为：
+1. **观测编码**：CNN 将 `3×32×96` RGB 编码为 64 维向量；Gaussian 集合经共享 MLP 和 masked mean 编码为 48 维，与速度拼接为 113 维观测特征。
+2. **随机动力学**：循环单元根据上一随机状态和 `[a/5, yaw_rate, dt, speed/20]` 更新确定性状态；先验预测随机状态分布，训练时后验额外读取对应观测。历史动作尚未进入观测契约，历史过滤使用零未知控制及已观测速度。
+3. **联合解码**：拼接确定性与随机状态，经投影后预测图像残差、Gaussian 属性及自车运动残差。几何分支包含解析自车运动先验，RGB 分支是独立反卷积解码器，不经过 Gaussian 渲染。
+4. **开环预测**：测试时仅使用历史观测和给定未来运动条件，未来状态全部从先验采样，不读取未来真实图像或几何。
 
 ```text
-L = L_rgb + 2 L_geometry + 0.2 L_attributes + 0.05 L_mask + 0.1 L_ego
+L_reconstruction = L_rgb + 2 L_geometry + 0.2 L_attributes + 0.05 L_mask + 0.1 L_ego
+L_total = L_reconstruction + 0.1 L_balanced_KL
 ```
 
-其中几何项使用双向最近邻集合距离，属性项包含固定采样槽属性误差与四元数符号不变项；检查点仅由验证集损失选择。默认历史 3 帧、预测 4 步，潜状态维度与预测长度可配置；当前图像解码分辨率和 Gaussian 槽位数固定。
-
-RSSM 增加连续随机潜状态、先验/后验和 balanced KL；条件 Diffusion 使用潜空间加噪训练与 DDIM 采样。新增后端目前完成框架与小张量测试，尚未进行数据集性能或 GPU 资源比较。架构、损失和实验限制见 [三类世界模型说明](docs/WORLD_MODEL_BACKENDS.md)。
+默认训练配置为确定性隐藏维度 256、随机维度 64、历史 4 帧、未来 8 帧。KL balance 默认为 0.8，free nats 为 1。图像分辨率为 32×96，64 个几何槽位不代表持久物体身份。详细训练契约与限制见 [RSSM 技术说明](docs/RSSM.md)。
 
 ## 技术文档
 
 | 模块 | 文档 | 内容 |
 |---|---|---|
 | DGGT 前端 | [DGGT 前端技术设计](docs/DGGT_Frontend.docx) | 原生网络结构、深度反投影、坐标转换、因果缓存、尺度锚定与状态契约 |
-| 世界模型 | [Gaussian 世界模型技术设计](docs/World_Model.docx) | GRU、RSSM 与条件 Diffusion 结构、共享预测头、训练目标和比较协议 |
+| 世界模型 | [Gaussian 世界模型技术设计](docs/World_Model.docx) | RSSM 先验后验、预测头、KL 训练目标与开环评估协议 |
 
 ## 安装
 
@@ -122,17 +120,34 @@ python -m drive_gaussian_world prepare \
   --raw data/kitti/raw --output data/processed/kitti_stereo
 
 # 在 GPU 上构建因果 DGGT 缓存；默认宽度 518，最多 4 帧历史。
-python -m drive_gaussian_world dggt-cache \
+CUDA_VISIBLE_DEVICES=0 python -m drive_gaussian_world dggt-cache \
   --dataset data/processed/kitti_stereo --raw data/kitti/raw \
   --output data/processed/kitti_dggt \
-  --device cuda:0 --width 518 --context 4 --precision fp32
+  --device cuda:0 --width 518 --context 4 --precision bf16 \
+  --memory-fraction 0.35 --resume
 
 python -m drive_gaussian_world validate --dataset data/processed/kitti_dggt
 python -m drive_gaussian_world audit \
   --dataset data/processed/kitti_dggt --output runs/data_audit.json
 ```
 
-输出目录须为新目录，防止覆盖已有实验。初始采集配置是工程示例；扩大数据时需调整日志清单、时间区间及划分，并重新生成对应缓存。数据来源、许可和划分限制见 [数据卡](docs/DATA_CARD.md)。
+DGGT 缓存必须通过 `CUDA_VISIBLE_DEVICES` 绑定一张物理卡，进程内使用 `cuda:0`。`--memory-fraction` 限制 PyTorch 分配器预算，不构成独占显存预留；应结合其他任务留出余量。`--resume` 校验输入清单、模型哈希及缓存参数，并复用已完成的帧。临时帧分片在对应日志完成后清理，不保留原生预测测试文件。
+
+```bash
+# 全量 20 条日志、全部 7,915 帧；保留原有日志级划分。
+python -m drive_gaussian_world prepare --raw data/kitti_driving/raw \
+  --all-collected --stride 1 --output data/processed/kitti_driving_stereo_full
+CUDA_VISIBLE_DEVICES=0 python -m drive_gaussian_world dggt-cache \
+  --dataset data/processed/kitti_driving_stereo_full --raw data/kitti_driving/raw \
+  --output data/processed/kitti_driving_dggt_full --width 280 --context 4 \
+  --device cuda:0 --precision bf16 --memory-fraction 0.35 --resume
+```
+
+也可运行 `CUDA_VISIBLE_DEVICES=0 bash scripts/cache_driving.sh`，自动依次准备、恢复缓存并校验全量数据。
+
+全量缓存已于 2026-11-24 完成：**20 条日志、7,915 帧，stride 1，训练/验证/测试日志 16/2/2**。来源、模型哈希及逐日志校验结果见 [DGGT 缓存清单](docs/DGGT_CACHE_MANIFEST.json)。
+
+宽度 280 为降低共享显卡负载的工程配置，不是原生 518 宽度基准。每帧仅使用当前和过去图像；尺度锚定失败时保留时间轴并将该帧几何标记为无效，在元数据记录原因，不伪造几何。数据来源、许可和划分限制见 [数据卡](docs/DATA_CARD.md)。
 
 ### 扩展行车数据与代理
 
@@ -160,62 +175,51 @@ python -m drive_gaussian_world prepare --raw data/kitti_driving/raw \
 
 ```bash
 python -m drive_gaussian_world train \
-  --dataset data/processed/kitti_dggt --output runs/world_model \
+  --dataset data/processed/kitti_driving_dggt_full --output runs/world_model \
   --device cuda:0 --precision fp16 \
-  --steps 20000 --batch-size 32 --history 3 --horizon 4 --hidden 96
+  --steps 20000 --batch-size 8 --history 4 --horizon 8 --hidden 256 \
+  --model-options '{"stochastic":64}'
 ```
 
 默认设备为 `cuda`；可指定 `cuda:N`，或使用 `--device auto` 自动选择设备。没有可用 CUDA 时，默认路径明确报错；本地调试可显式传入 `--device cpu --precision fp32`。FP16 使用梯度缩放，BF16 需硬件支持；显存占用取决于 DGGT 分辨率、历史长度和训练批大小。
 
-### 切换动力学后端
-
-训练命令增加 `--backend gru|rssm|diffusion`，默认保持 `gru`，旧检查点兼容加载。
+### RSSM 配置
 
 ```bash
-# RSSM：连续随机潜状态与先验/后验训练
-python -m drive_gaussian_world train \
-  --dataset data/processed/kitti_dggt --output runs/rssm \
-  --backend rssm --model-options '{"stochastic":32,"kl_weight":0.1}' --device cuda:0
-
-# Diffusion：潜空间噪声预测训练，20 步 DDIM 采样
-python -m drive_gaussian_world train \
-  --dataset data/processed/kitti_dggt --output runs/diffusion \
-  --backend diffusion --model-options '{"diffusion_steps":100,"sampling_steps":20}' --device cuda:0
-
-# 数据与算力就绪后，使用同一份缓存运行三个后端
-python -m drive_gaussian_world experiments \
-  --dataset data/processed/kitti_dggt --config configs/comparison.json \
-  --output runs/model_comparison
+CUDA_VISIBLE_DEVICES=0 python -m drive_gaussian_world train \
+  --dataset data/processed/kitti_driving_dggt_full --output runs/rssm \
+  --hidden 256 --history 4 --horizon 8 --batch-size 8 \
+  --model-options '{"stochastic":64,"kl_weight":0.1}' --device cuda:0
 ```
 
-单后端配置位于 `configs/world_models/`；评估、Demo 和 API 根据检查点自动选择后端。评估时添加 `--samples 5 --seed 42` 可输出平均样本 ADE、best-of-K ADE 和轨迹离散度。RSSM 当前只实现世界模型，不包含 Dreamer actor/critic；Diffusion 当前使用联合学习的紧凑场景编码器。相同隐藏维度与训练步数不代表相同计算预算，后续比较需补充多种子和显存/延迟测量。
+工程只提供 RSSM 世界模型。`--backend rssm` 保留用于检查点和配置显式标记；旧的其他架构检查点不再支持。RSSM 配置位于 `configs/default.json`。评估添加 `--samples 5 --seed 42` 可输出平均样本 ADE、best-of-K ADE 和轨迹离散度。
 
 ### 评估与消融
 
 ```bash
 python -m drive_gaussian_world evaluate \
-  --dataset data/processed/kitti_dggt --checkpoint runs/world_model/best.pt \
+  --dataset data/processed/kitti_driving_dggt_full --checkpoint runs/world_model/best.pt \
   --device cuda:0 --split test --output runs/world_model/test.json
 
 python -m drive_gaussian_world experiments \
-  --dataset data/processed/kitti_dggt \
-  --stereo-dataset data/processed/kitti_stereo \
+  --dataset data/processed/kitti_driving_dggt_full \
+  --stereo-dataset data/processed/kitti_driving_stereo_full \
   --config configs/default.json --output runs/ablations
 ```
 
 实验包括完整模型、RGB-only、移除动作条件及 stereo 表征对照；基线包括末帧保持、解析刚体运动和匀速运动。输出 RGB L1/PSNR、自车 ADE/FDE、Gaussian 集合距离和有效采样 mask IoU。
 
-**条件协议**：当前动作是由 OXTS 差分得到的 `[acceleration, yaw_rate]` 运动代理，不是实测油门/方向盘命令。`learned_logged_motion` 提供未来日志运动作为条件；`learned_current_motion` 不提供未来运动标签。Gaussian 指标主要针对前端伪标签，不能替代独立真实几何评估。已有小样本参考结果见 [实验记录](docs/RESULTS.md)，并非 GPU 大规模训练结果或基准性能承诺。
+**条件协议**：当前动作是由 OXTS 差分得到的 `[acceleration, yaw_rate]` 运动代理，不是实测油门/方向盘命令。`learned_logged_motion` 提供未来日志运动作为条件；`learned_current_motion` 不提供未来运动标签。Gaussian 指标主要针对前端伪标签，不能替代独立真实几何评估。RSSM 先导结果见 [实验记录](docs/RESULTS.md)，并非 GPU 大规模训练结果或基准性能承诺。
 
 ### 可视化与推理服务
 
 ```bash
 python -m drive_gaussian_world demo \
-  --dataset data/processed/kitti_dggt --checkpoint runs/world_model/best.pt \
+  --dataset data/processed/kitti_driving_dggt_full --checkpoint runs/world_model/best.pt \
   --device cuda:0 --output runs/demo
 
 python -m drive_gaussian_world serve \
-  --dataset data/processed/kitti_dggt --checkpoint runs/world_model/best.pt \
+  --dataset data/processed/kitti_driving_dggt_full --checkpoint runs/world_model/best.pt \
   --device cuda:0 --port 8765
 ```
 
@@ -228,7 +232,7 @@ curl -X POST http://127.0.0.1:8765/api/rollout \
   -d '{"window":0,"dt":0.4,"actions":[[0,0],[0,0],[0,0],[0,0]]}'
 ```
 
-动作长度应与检查点的预测 horizon 一致。离线候选动作比较仅用于研究，当前没有真实车辆执行器或闭环碰撞验证。
+动作长度应与检查点的预测 horizon 一致。API 用于离线条件预测，不包含车辆执行器。
 
 ## 项目结构
 
@@ -240,7 +244,6 @@ DriveGaussianWorld/
 │   ├── data/                # 采集、同步、契约、窗口与来源审计
 │   ├── geometry/            # DGGT 适配与双目尺度参考
 │   ├── models/              # 多模态编码、递归动力学、解码与损失
-│   ├── planning/            # 离线候选动作比较
 │   ├── train.py             # 训练、混合精度与检查点
 │   ├── evaluate.py          # 条件评估与解析基线
 │   ├── demo.py              # 可视化报告
@@ -254,7 +257,7 @@ DriveGaussianWorld/
 
 ```bash
 make test
-make pipeline DEVICE=cuda CONFIG=configs/default.json
+CUDA_VISIBLE_DEVICES=0 make pipeline DEVICE=cuda CONFIG=configs/default.json
 ```
 
 测试使用小型 fixture 验证数据与数值契约，不启动完整训练。提交改动时请覆盖坐标、时间或设备相关的回归检查，记录数据与模型来源，并保持训练目标和推理输入之间的因果边界。

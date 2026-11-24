@@ -8,7 +8,7 @@ from pathlib import Path
 from drive_gaussian_world.common import configure_runtime,resolve_device,move_to,precision_context,fresh_dir,read_json,write_json,sha256
 
 def train(dataset,output,steps=200,batch_size=4,history=3,horizon=4,hidden=96,lr=0.0003,
-          seed=42,threads=2,no_geometry=False,no_actions=False,device='cuda',precision='fp32',num_workers=0,backend='gru',model_options=None):
+          seed=42,threads=2,no_geometry=False,no_actions=False,device='cuda',precision='fp32',num_workers=0,backend='rssm',model_options=None):
     if min(steps,batch_size,history,horizon,hidden,threads)<=0 or num_workers<0 or lr<=0:
         raise ValueError('invalid training hyperparameters')
     selected=configure_runtime(seed,threads,device)
@@ -89,7 +89,7 @@ def load_model(checkpoint,device='cuda'):
     from drive_gaussian_world.models import build_world_model
     selected=resolve_device(device)
     ckpt=torch.load(checkpoint,map_location='cpu',weights_only=True)
-    cfg=ckpt['config'];model=build_world_model(cfg.get('backend','gru'),cfg['hidden'],not cfg['no_geometry'],cfg.get('model_options'))
+    cfg=ckpt['config'];model=build_world_model(cfg.get('backend','rssm'),cfg['hidden'],not cfg['no_geometry'],cfg.get('model_options'))
     model.load_state_dict(ckpt['model'],strict=True);model.to(selected).eval()
     return model,ckpt
 
@@ -98,7 +98,7 @@ def main():
     for name,default in [('steps',20000),('batch-size',32),('history',3),('horizon',4),('hidden',96),('seed',42),('threads',2),('num-workers',0)]:
         p.add_argument('--'+name,type=int,default=default)
     p.add_argument('--lr',type=float,default=0.0003)
-    p.add_argument('--backend',choices=['gru','rssm','diffusion'],default='gru')
+    p.add_argument('--backend',choices=['rssm'],default='rssm')
     p.add_argument('--model-options',type=json.loads,default={},help='Backend options as a JSON object')
     p.add_argument('--device',default='cuda',help='cuda, cuda:N, cpu or auto')
     p.add_argument('--precision',choices=['fp32','fp16','bf16'],default='fp32')

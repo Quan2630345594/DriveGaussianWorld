@@ -1,4 +1,4 @@
-"""Compact recurrent Gaussian world model; no future observations in open-loop rollout."""
+"""Observation encoders, residual prediction heads and losses for the RSSM."""
 from __future__ import annotations
 import torch
 from torch import nn
@@ -19,32 +19,18 @@ def warp_gaussians(tokens,speed,actions,dt):
     ego=torch.stack([forward,left,angle],-1)
     return prior,next_speed,ego
 
-class GaussianWorldModel(nn.Module):
+class SceneDecoder(nn.Module):
     def __init__(self,hidden=96,use_geometry=True):
         super().__init__();self.hidden=hidden;self.use_geometry=use_geometry
         self.image_encoder=nn.Sequential(nn.Conv2d(3,16,5,2,2),nn.SiLU(),nn.Conv2d(16,32,3,2,1),
             nn.SiLU(),nn.Conv2d(32,32,3,2,1),nn.SiLU(),nn.AdaptiveAvgPool2d((2,6)),nn.Flatten(),nn.Linear(384,64))
         self.token_encoder=nn.Sequential(nn.Linear(16,48),nn.SiLU(),nn.Linear(48,48))
-        self.observer=nn.GRUCell(64+48+1,hidden)
-        self.dynamics=nn.GRUCell(4,hidden)
         self.image_decoder=nn.Sequential(nn.Linear(hidden,32*4*12),nn.SiLU(),nn.Unflatten(1,(32,4,12)),
             nn.ConvTranspose2d(32,24,4,2,1),nn.SiLU(),nn.ConvTranspose2d(24,16,4,2,1),nn.SiLU(),
             nn.ConvTranspose2d(16,3,4,2,1))
         self.slots=nn.Embedding(64,16)
         self.gaussian_decoder=nn.Sequential(nn.Linear(hidden+16+16,96),nn.SiLU(),nn.Linear(96,17))
         self.ego_decoder=nn.Sequential(nn.Linear(hidden,32),nn.SiLU(),nn.Linear(32,3))
-    def observe(self,observation):
-        if set(observation)!={'rgb','tokens','mask','speed'}:raise ValueError('unexpected observation fields')
-        rgb,tokens,mask,speed=[observation[k] for k in ['rgb','tokens','mask','speed']]
-        b,t=rgb.shape[:2];h=rgb.new_zeros((b,self.hidden))
-        for i in range(t):
-            image=self.image_encoder(rgb[:,i])
-            token=self.token_encoder(tokens[:,i])
-            token=(token*mask[:,i,:,None]).sum(1)/mask[:,i].sum(1,keepdim=True).clamp_min(1)
-            if not self.use_geometry:token=torch.zeros_like(token)
-            h=self.observer(torch.cat([image,token,speed[:,i,None]/20],-1),h)
-        return self.scene_state(observation,h)
-
     def scene_state(self,observation,h):
         rgb,tokens,mask,speed=[observation[k] for k in ('rgb','tokens','mask','speed')]
         last_tokens=tokens[:,-1]
@@ -73,23 +59,6 @@ class GaussianWorldModel(nn.Module):
         ego=ego+torch.tanh(self.ego_decoder(h))*ego.new_tensor([1.,1.,0.1])
         return image,tokens,raw[:,:,16],ego,speed
 
-    def rollout(self,state,actions,dt):
-        if actions.ndim!=3 or actions.shape[-1]!=2 or dt.shape!=actions.shape[:2]:
-            raise ValueError('scenario must have actions [B,H,2], dt [B,H]')
-        h=state['hidden'];image=state['rgb'];tokens=state['tokens'];speed=state['speed']
-        rgb=[];gaussian=[];masks=[];egos=[]
-        for i in range(actions.shape[1]):
-            a=actions[:,i];delta=dt[:,i]
-            h=self.dynamics(torch.cat([a[:,:1]/5,a[:,1:2],delta[:,None],speed[:,None]/20],-1),h)
-            image,tokens,mask,ego,speed=self.decode_step(h,image,tokens,speed,a,delta)
-            rgb.append(image);gaussian.append(tokens);masks.append(mask);egos.append(ego)
-        return {'rgb':torch.stack(rgb,1),'tokens':torch.stack(gaussian,1),
-                'mask_logits':torch.stack(masks,1),'ego':torch.stack(egos,1)}
-    def forward(self,observation,actions,dt):
-        return self.rollout(self.observe(observation),actions,dt)
-
-    def training_loss(self,observation,actions,dt,target):
-        return world_loss(self(observation,actions,dt),target)
 
 def world_loss(pred,target):
     valid=target['mask'].float();denom=valid.sum().clamp_min(1)

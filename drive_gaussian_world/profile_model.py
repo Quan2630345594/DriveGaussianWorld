@@ -7,7 +7,7 @@ import time
 from drive_gaussian_world.common import configure_runtime,precision_context,write_json
 
 
-def profile(backend='gru',output=None,device='cuda',precision='fp32',hidden=96,
+def profile(backend='rssm',output=None,device='cuda',precision='fp32',hidden=96,
             batch_size=4,history=3,horizon=4,warmup=3,iterations=20,seed=42,model_options=None):
     if min(hidden,batch_size,history,horizon,iterations)<1 or warmup<0:raise ValueError('invalid profiling dimensions')
     selected=configure_runtime(seed,2,device)
@@ -52,7 +52,7 @@ def profile(backend='gru',output=None,device='cuda',precision='fp32',hidden=96,
 
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--backend',choices=['gru','rssm','diffusion'],default='gru')
+    p=argparse.ArgumentParser();p.add_argument('--backend',choices=['rssm'],default='rssm')
     p.add_argument('--output');p.add_argument('--device',default='cuda')
     p.add_argument('--precision',choices=['fp32','fp16','bf16'],default='fp32')
     for key,default in [('hidden',96),('batch-size',4),('history',3),('horizon',4),('warmup',3),('iterations',20),('seed',42)]:

@@ -7,6 +7,8 @@ DGW_RUN="${1:-runs/drive_$(date +%Y%m%d_%H%M%S)}"
 DGW_CONFIG="${DGW_CONFIG:-configs/default.json}"
 DGW_WIDTH="${DGW_WIDTH:-518}"
 DGW_CONTEXT="${DGW_CONTEXT:-4}"
+: "${CUDA_VISIBLE_DEVICES:?Set exactly one physical GPU, for example CUDA_VISIBLE_DEVICES=0}"
+if [[ "$CUDA_VISIBLE_DEVICES" == *,* ]]; then echo "Only one GPU is permitted" >&2; exit 1; fi
 # The same configuration controls device and precision for every model stage.
 "$DGW_PYTHON" -m drive_gaussian_world collect --root data/kitti --frames 128 --stride 4
 "$DGW_PYTHON" -m drive_gaussian_world prepare --output "$DGW_RUN/stereo" --frames 128 --stride 4

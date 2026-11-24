@@ -1,5 +1,4 @@
 """Tiny tensor contracts only; no DGGT weights, dataset downloads or GPU work."""
-import json
 import pytest
 import torch
 from torch.utils.data import default_collate
@@ -9,7 +8,7 @@ from drive_gaussian_world.models.world import world_loss
 
 
 def make_model(name):
-    options={'diffusion_steps':8,'sampling_steps':2} if name=='diffusion' else {'stochastic':8,'free_nats':0.} if name=='rssm' else {}
+    options={'stochastic':8,'free_nats':0.}
     return build_world_model(name,hidden=32,model_options=options)
 
 
@@ -17,7 +16,7 @@ def get_batch(dataset):
     return default_collate([DrivingWindows(dataset)[0],DrivingWindows(dataset)[1]])
 
 
-@pytest.mark.parametrize('name',['gru','rssm','diffusion'])
+@pytest.mark.parametrize('name',['rssm'])
 def test_backend_loss_and_causal_rollout(name,dataset):
     batch=get_batch(dataset);model=make_model(name)
     loss,logs=model.training_loss(batch['observation'],**batch['condition'],target=batch['target'])
@@ -27,9 +26,6 @@ def test_backend_loss_and_causal_rollout(name,dataset):
     if name=='rssm':
         assert model.prior[-1].weight.grad.abs().sum()>0
         assert model.posterior[-1].weight.grad.abs().sum()>0
-    if name=='diffusion':
-        assert model.denoiser[-1].weight.grad.abs().sum()>0
-        assert model.latent_encoder[0].weight.grad.abs().sum()>0
     assert all(torch.isfinite(p.grad).all() for p in model.parameters() if p.grad is not None)
     model.eval()
     with torch.no_grad():
@@ -44,7 +40,7 @@ def test_backend_loss_and_causal_rollout(name,dataset):
     with pytest.raises(ValueError,match='unexpected'):model.observe(bad)
 
 
-@pytest.mark.parametrize('name',['rssm','diffusion'])
+@pytest.mark.parametrize('name',['rssm'])
 def test_sampling_seed_diversity_and_action_response(name,dataset):
     b=get_batch(dataset);m=make_model(name).eval()
     with torch.no_grad():
@@ -61,7 +57,7 @@ def test_sampling_seed_diversity_and_action_response(name,dataset):
         assert not torch.allclose(p['tokens'],q['tokens'])
 
 
-@pytest.mark.parametrize('name',['rssm','diffusion'])
+@pytest.mark.parametrize('name',['rssm'])
 def test_stochastic_rgb_only_removes_geometry(name,dataset):
     b=get_batch(dataset);m=make_model(name).eval();m.use_geometry=False
     with torch.no_grad():
@@ -71,12 +67,12 @@ def test_stochastic_rgb_only_removes_geometry(name,dataset):
     for key in first:torch.testing.assert_close(first[key],second[key],rtol=0,atol=0)
 
 
-@pytest.mark.parametrize('name',['rssm','diffusion'])
+@pytest.mark.parametrize('name',['rssm'])
 def test_backend_checkpoint_evaluation_and_demo(name,dataset,tmp_path):
     from drive_gaussian_world.train import train,load_model
     from drive_gaussian_world.evaluate import evaluate
     from drive_gaussian_world.demo import make_demo
-    options={'diffusion_steps':8,'sampling_steps':2} if name=='diffusion' else {'stochastic':8}
+    options={'stochastic':8}
     path=train(dataset,tmp_path/name,steps=1,batch_size=2,hidden=32,device='cpu',backend=name,model_options=options)
     model,state=load_model(path,device='cpu')
     assert state['config']['backend']==name
@@ -89,47 +85,10 @@ def test_backend_checkpoint_evaluation_and_demo(name,dataset,tmp_path):
     assert (tmp_path/'demo'/'rollout.gif').exists()
 
 
-def test_old_gru_checkpoint_without_backend(dataset,tmp_path):
-    from drive_gaussian_world.train import load_model
-    model=make_model('gru');path=tmp_path/'old.pt'
-    torch.save({'model':model.state_dict(),'config':{'hidden':32,'no_geometry':False}},path)
-    loaded,_=load_model(path,device='cpu')
-    for key,value in model.state_dict().items():torch.testing.assert_close(value,loaded.state_dict()[key])
-
-
-def test_diffusion_noise_schedule_and_invalid_options():
-    m=make_model('diffusion');alpha=m.alpha_bar
-    assert (alpha>0).all() and (alpha<1).all() and (alpha[1:]<alpha[:-1]).all()
-    clean=torch.randn(2,32);noise=torch.randn_like(clean);t=torch.tensor([0,7])
-    noisy=m.q_sample(clean,t,noise)
-    restored=(noisy-(1-alpha[t,None]).sqrt()*noise)/alpha[t,None].sqrt()
-    torch.testing.assert_close(restored,clean,rtol=1e-4,atol=1e-4)
-    with pytest.raises(ValueError):build_world_model('invalid')
-    with pytest.raises(ValueError):build_world_model('diffusion',model_options={'sampling_steps':101})
-
-
 def test_balanced_kl_is_zero_for_same_distribution():
     model=make_model('rssm')
     mean=torch.randn(2,8);std=torch.rand(2,8)+.1
     assert model.balanced_kl((mean,std),(mean,std)).item()==pytest.approx(0,abs=1e-6)
-
-
-def test_comparison_suite_uses_all_backends(dataset,tmp_path):
-    from pathlib import Path
-    from drive_gaussian_world.experiments import run
-    cfg=json.loads(Path('configs/comparison.json').read_text())
-    cfg['device']='cpu';cfg['threads']=2
-    cfg['training'].update(steps=1,batch_size=2)
-    cfg['model']['hidden']=32
-    cfg['backends']['diffusion']['model_options'].update(diffusion_steps=8,sampling_steps=2)
-    cfg['evaluation']['samples']=2
-    path=tmp_path/'comparison.json';path.write_text(json.dumps(cfg))
-    output=Path(run(dataset,tmp_path/'suite',config=path))
-    report=json.loads((output/'comparison.json').read_text())
-    assert set(report)=={'gru','rssm','diffusion'}
-    assert all(report[name]['backend']==name for name in report)
-    assert json.loads((output/'status.json').read_text())['status']=='COMPLETED'
-    assert not torch.cuda.is_initialized()
 
 
 def test_train_subcommand_help_exposes_backend_options(monkeypatch,capsys):
@@ -142,26 +101,13 @@ def test_train_subcommand_help_exposes_backend_options(monkeypatch,capsys):
     assert '--backend' in help_text and '--model-options' in help_text
 
 
-@pytest.mark.parametrize('name',['gru','rssm','diffusion'])
+@pytest.mark.parametrize('name',['rssm'])
 def test_profiler_cpu_contract_uses_cuda_build_without_gpu(name,tmp_path):
     from drive_gaussian_world.profile_model import profile
-    options={'diffusion_steps':8,'sampling_steps':2} if name=='diffusion' else {}
+    options={}
     result=profile(name,output=tmp_path/'profile.json',device='cpu',hidden=32,batch_size=1,
                    history=2,horizon=2,warmup=0,iterations=1,model_options=options)
     assert result['parameters']>0 and result['mean_rollout_ms']>0
     assert result['peak_cuda_allocated_bytes'] is None
     assert not torch.cuda.is_initialized()
 
-
-def test_diffusion_rgb_only_training_has_no_teacher_geometry_skip(dataset):
-    b=get_batch(dataset);m=make_model('diffusion');m.use_geometry=False
-    original=m.decode_step;inputs=[]
-    def capture(h,image,tokens,speed,a,delta):
-        inputs.append(tokens.detach().clone())
-        return original(h,image,tokens,speed,a,delta)
-    m.decode_step=capture
-    torch.manual_seed(71);m.training_loss(b['observation'],**b['condition'],target=b['target'])
-    first=inputs.copy();inputs.clear()
-    b['target']['tokens'].fill_(7);b['target']['mask'].fill_(False)
-    torch.manual_seed(71);m.training_loss(b['observation'],**b['condition'],target=b['target'])
-    for x,y in zip(first,inputs):torch.testing.assert_close(x,y,rtol=0,atol=0)

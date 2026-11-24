@@ -6,6 +6,9 @@ DGGT temporal attention would expose the prediction target to the encoder.
 """
 from __future__ import annotations
 import argparse
+import copy
+import json
+import os
 import shutil
 import sys
 import time
@@ -93,30 +96,69 @@ class NativeDGGT:
         result['world_points_conf']=result['depth_conf']
         return result,e[0,-1].float().cpu().numpy(),k[0,-1].float().cpu().numpy()
 
-def cache(dataset,raw,output,upstream,checkpoint,width=518,context=4,threads=2,device='cuda',precision='fp32'):
+def cache(dataset,raw,output,upstream,checkpoint,width=518,context=4,threads=2,device='cuda',precision='fp32',resume=False,memory_fraction=0.35):
     if not 1<=context<=64:raise ValueError('context must be in [1,64]')
-    dataset=Path(dataset);raw=Path(raw);output=fresh_dir(output)
-    index=read_json(dataset/'dataset.json')
-    model=NativeDGGT(upstream,checkpoint,width,threads,device,precision)
+    dataset=Path(dataset);raw=Path(raw)
+    if not 0<memory_fraction<=1:raise ValueError('invalid memory fraction')
+    output=Path(output)
+    if resume:output.mkdir(parents=True,exist_ok=True)
+    else:output=fresh_dir(output)
+    index=copy.deepcopy(read_json(dataset/'dataset.json'))
+    import torch
+    if str(device).startswith('cuda'):
+        if len(os.environ.get('CUDA_VISIBLE_DEVICES','').split(','))!=1 or not os.environ.get('CUDA_VISIBLE_DEVICES'):
+            raise ValueError('DGGT caching requires exactly one CUDA_VISIBLE_DEVICES entry')
+        torch.cuda.set_per_process_memory_fraction(memory_fraction,torch.device(device))
     checkpoint_hash=sha256(checkpoint)
+    protocol={'input_dataset_sha256':sha256(dataset/'dataset.json'),
+              'checkpoint_sha256':checkpoint_hash,'width':width,'context':context,'precision':precision}
+    if (output/'protocol.json').exists() and read_json(output/'protocol.json')!=protocol:
+        raise ValueError('resume protocol mismatch')
+    write_json(output/'protocol.json',protocol)
+    model=NativeDGGT(upstream,checkpoint,width,threads,device,precision)
     import subprocess
     commit=subprocess.check_output(['git','-C',str(upstream),'rev-parse','HEAD'],text=True).strip()
+    completed=0;total=0
+    for episode in index['episodes']:
+        with np.load(dataset/episode['path'],allow_pickle=False) as arrays:total+=len(arrays['frame_ids'])
     for e in index['episodes']:
+        finalmeta=output/f'{e["scene_id"]}.dggt.json'
+        if resume and finalmeta.exists() and (output/e['path']).exists():
+            meta=read_json(finalmeta)
+            if meta.get('output_sha256')==sha256(output/e['path']):
+                e.update(sha256=meta['output_sha256'],geometry_source='dggt',geometry_metadata=finalmeta.name)
+                completed+=len(meta['frames'])
+                continue
+        progress=output/'.progress'/e['scene_id'];progress.mkdir(parents=True,exist_ok=True)
         with np.load(dataset/e['path'],allow_pickle=False) as f:a=dict(f)
         source=read_json(dataset/e['sources'])
         history=[];tok=[];mask=[]
         for i,fid in enumerate(a['frame_ids']):
             start=max(0,i-context+1)
             paths=[raw/source['frames'][j]['left'] for j in range(start,i+1)]
-            began=time.monotonic()
-            pred,extri,k=model(paths)
-            t,m,scale=prediction_tokens(pred,extri,a['tokens'][i],a['token_mask'][i])
-            tok.append(t);mask.append(m)
-            history.append({'target_frame_id':int(fid),'source_frame_ids':a['frame_ids'][start:i+1].tolist(),
-                'wall_seconds':time.monotonic()-began,'valid_tokens':int(m.sum()),**scale})
-            if i==0:
-                np.savez_compressed(output/f'{e["scene_id"]}.native_sample.npz',**pred,extrinsics=extri,intrinsics=k)
-            print(f'DGGT {e["split"]} {i+1}/{len(a["frame_ids"])}: {history[-1]["wall_seconds"]:.2f}s',flush=True)
+            framefile=progress/f'{int(fid):010d}.npz'
+            if resume and framefile.exists():
+                with np.load(framefile,allow_pickle=False) as saved:
+                    t=saved['tokens'];m=saved['mask'];record=json.loads(str(saved['record']))
+            else:
+                began=time.monotonic()
+                pred,extri,k=model(paths)
+                try:
+                    t,m,scale=prediction_tokens(pred,extri,a['tokens'][i],a['token_mask'][i])
+                except ValueError as error:
+                    if str(error) not in ('insufficient historical stereo anchors for metric scale','invalid scale'):raise
+                    t=np.zeros((64,16),np.float32);t[:,10]=1;t[:,7:10]=1e-5
+                    m=np.zeros(64,bool)
+                    scale={'metric_status':'INVALID','reason':str(error)}
+                record={'target_frame_id':int(fid),'source_frame_ids':a['frame_ids'][start:i+1].tolist(),
+                    'wall_seconds':time.monotonic()-began,'valid_tokens':int(m.sum()),**scale}
+                temporary=framefile.with_suffix('.tmp.npz')
+                np.savez_compressed(temporary,tokens=t,mask=m,record=json.dumps(record))
+                temporary.replace(framefile)
+            tok.append(t);mask.append(m);history.append(record);completed+=1
+            write_json(output/'status.json',{'status':'RUNNING','completed_frames':completed,'total_frames':total,
+                       'scene_id':e['scene_id'],'frame_id':int(fid),'physical_gpu':os.environ.get('CUDA_VISIBLE_DEVICES')})
+            print(f'DGGT {e["scene_id"]} {i+1}/{len(a["frame_ids"])} total={completed}/{total}: {record["wall_seconds"]:.2f}s',flush=True)
         a['tokens']=np.stack(tok);a['token_mask']=np.stack(mask)
         np.savez_compressed(output/e['path'],**a)
         source.update({'geometry_source':'dggt','scale_reference':'historical_stereo_sgbm',
@@ -127,12 +169,16 @@ def cache(dataset,raw,output,upstream,checkpoint,width=518,context=4,threads=2,d
             'checkpoint_sha256':checkpoint_hash,'checkpoint_name':Path(checkpoint).name,
             'device':str(model.device),'precision':precision,'causal':True,'max_context_frames':context,'input_width':width,
             'resolution_note':'Native width' if width==518 else 'Reduced input width; not a native-resolution benchmark',
-            'frames':history,'input_dataset_sha256':sha256(dataset/'dataset.json')})
+            'frames':history,'input_dataset_sha256':sha256(dataset/'dataset.json'),
+            'output_sha256':sha256(output/e['path'])})
+        shutil.rmtree(progress)
         e.update({'sha256':sha256(output/e['path']),'geometry_source':'dggt','geometry_metadata':meta})
     index['geometry_note']='Native pretrained DGGT, historical stereo scale anchoring; no road/drivability ground truth'
     write_json(output/'dataset.json',index)
     report=validate_dataset(output)
     write_json(output/'validation.json',{'status':'PASS','episodes':report})
+    shutil.rmtree(output/'.progress',ignore_errors=True)
+    write_json(output/'status.json',{'status':'COMPLETED','completed_frames':completed,'total_frames':total})
     return report
 
 def main():
@@ -142,6 +188,8 @@ def main():
     p.add_argument('--width',type=int,default=518);p.add_argument('--context',type=int,default=4)
     p.add_argument('--threads',type=int,default=2)
     p.add_argument('--device',default='cuda');p.add_argument('--precision',choices=['fp32','fp16','bf16'],default='fp32')
+    p.add_argument('--resume',action='store_true')
+    p.add_argument('--memory-fraction',type=float,default=0.35)
     a=p.parse_args()
     print(cache(**vars(a)))
 if __name__=='__main__':main()

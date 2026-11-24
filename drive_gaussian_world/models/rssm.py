@@ -3,11 +3,19 @@ from __future__ import annotations
 import torch
 from torch import nn
 import torch.nn.functional as F
-from .stochastic import StochasticWorldModel,control,stack_predictions
-from .world import world_loss
+from .world import SceneDecoder,world_loss
 
 
-class RSSMWorldModel(StochasticWorldModel):
+def control(actions,dt,speed):
+    return torch.cat([actions[:,:1]/5,actions[:,1:2],dt[:,None],speed[:,None]/20],-1)
+
+
+def stack_predictions(frames):
+    return {key:torch.stack([frame[i] for frame in frames],1)
+            for i,key in enumerate(('rgb','tokens','mask_logits','ego'))}
+
+
+class RSSMWorldModel(SceneDecoder):
     def __init__(self,hidden=96,use_geometry=True,stochastic=32,kl_weight=0.1,
                  kl_balance=0.8,free_nats=1.0):
         super().__init__(hidden,use_geometry)
@@ -15,9 +23,8 @@ class RSSMWorldModel(StochasticWorldModel):
             raise ValueError('invalid RSSM configuration')
         self.stochastic=stochastic;self.kl_weight=kl_weight
         self.kl_balance=kl_balance;self.free_nats=free_nats
-        # Replace the deterministic future dynamics; retain common observation encoder/heads.
+        # Dreamer-style recurrent deterministic state and stochastic latent state.
         self.dynamics=nn.GRUCell(stochastic+4,hidden)
-        del self.observer
         self.prior=nn.Sequential(nn.Linear(hidden,hidden),nn.SiLU(),nn.Linear(hidden,2*stochastic))
         self.posterior=nn.Sequential(nn.Linear(hidden+113,hidden),nn.SiLU(),nn.Linear(hidden,2*stochastic))
         self.feature=nn.Sequential(nn.Linear(hidden+stochastic,hidden),nn.SiLU())
@@ -90,3 +97,25 @@ class RSSMWorldModel(StochasticWorldModel):
         total=reconstruction+self.kl_weight*kl
         logs.update(reconstruction=float(reconstruction.detach()),kl=float(kl.detach()),total=float(total.detach()))
         return total,logs
+
+    def encode_frame(self,rgb,tokens,mask,speed):
+        image=self.image_encoder(rgb)
+        token=self.token_encoder(tokens)
+        token=(token*mask[:,:,None]).sum(1)/mask.sum(1,keepdim=True).clamp_min(1)
+        if not self.use_geometry:token=torch.zeros_like(token)
+        return torch.cat([image,token,speed[:,None]/20],-1)
+
+    @staticmethod
+    def validate_condition(actions,dt):
+        if actions.ndim!=3 or actions.shape[-1]!=2 or dt.shape!=actions.shape[:2] or actions.shape[1]<1:
+            raise ValueError('scenario must have actions [B,H,2], dt [B,H] with H >= 1')
+
+    def forward(self,observation,actions,dt,*,sample=True,generator=None):
+        return self.rollout(self.observe(observation,sample=sample,generator=generator),
+                            actions,dt,sample=sample,generator=generator)
+
+    def sample_predictions(self,observation,actions,dt,count=5,seed=42):
+        if count<1:raise ValueError('count must be positive')
+        generator=torch.Generator(device=actions.device).manual_seed(seed)
+        samples=[self(observation,actions,dt,generator=generator) for _ in range(count)]
+        return {key:torch.stack([item[key] for item in samples]) for key in samples[0]}

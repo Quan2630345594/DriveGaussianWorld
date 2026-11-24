@@ -1,0 +1,203 @@
+{
+  "status": "PASS",
+  "logs": 20,
+  "frames": 7915,
+  "split_logs": {
+    "train": 16,
+    "test": 2,
+    "val": 2
+  },
+  "split_frames": {
+    "train": 6657,
+    "test": 820,
+    "val": 438
+  },
+  "protocol": {
+    "input_dataset_sha256": "ad056c5e4cb11acaef5a3926fd0f82ed37c5fc799ea49918c93a1c03047a8cc9",
+    "checkpoint_sha256": "352652738a5480b8d3ee9dd521ce07b528e5a297bd3feca4d07427dac6d87def",
+    "width": 280,
+    "context": 4,
+    "precision": "bf16"
+  },
+  "invalid_geometry_frames": 0,
+  "dataset_sha256": "530ace9e649006e9679d5fe6a64b7aaf4e06fc72efc190e5baa992c791472bc5",
+  "episodes": [
+    {
+      "scene_id": "2011_09_26_drive_0005_sync",
+      "split": "train",
+      "frames": 154,
+      "invalid_geometry_frames": 0,
+      "valid_token_fraction": 0.9981737012987013,
+      "sha256": "29e6b7da57e052a722ad0893e27761c4fd8e24071ca505ad087306963eff1c8a"
+    },
+    {
+      "scene_id": "2011_09_26_drive_0011_sync",
+      "split": "train",
+      "frames": 233,
+      "invalid_geometry_frames": 0,
+      "valid_token_fraction": 0.9989270386266095,
+      "sha256": "888c724ce3eff1eb791a46035f72dbddbc68db8e55b95da1f39e62e2627d8e67"
+    },
+    {
+      "scene_id": "2011_09_26_drive_0015_sync",
+      "split": "train",
+      "frames": 297,
+      "invalid_geometry_frames": 0,
+      "valid_token_fraction": 0.9865319865319865,
+      "sha256": "7923697a2a993455e4c4d094676a14dab52754c81720f7e906a5884d5d4dfd24"
+    },
+    {
+      "scene_id": "2011_09_26_drive_0027_sync",
+      "split": "train",
+      "frames": 188,
+      "invalid_geometry_frames": 0,
+      "valid_token_fraction": 0.9972573138297872,
+      "sha256": "55fdfcb5a98b824fce2816deecb5a45480594365438acc12bdc99df1b160e67f"
+    },
+    {
+      "scene_id": "2011_09_26_drive_0028_sync",
+      "split": "train",
+      "frames": 430,
+      "invalid_geometry_frames": 0,
+      "valid_token_fraction": 0.9914970930232558,
+      "sha256": "bd89ce0d2c210ce0bd646ce0c038e97f2d2e6c3225bf73bc7699ef368ed0aff3"
+    },
+    {
+      "scene_id": "2011_09_26_drive_0029_sync",
+      "split": "train",
+      "frames": 430,
+      "invalid_geometry_frames": 0,
+      "valid_token_fraction": 0.9740552325581395,
+      "sha256": "1b647b208e639c2f7cbc3595b59015e242b54a37a013c69c1127f9aa7e75f356"
+    },
+    {
+      "scene_id": "2011_09_26_drive_0032_sync",
+      "split": "train",
+      "frames": 390,
+      "invalid_geometry_frames": 0,
+      "valid_token_fraction": 0.9710336538461538,
+      "sha256": "ab70432072d9007d9debd40499527f115cb9cdbfb2af72bcc77ca54f38b1d6f4"
+    },
+    {
+      "scene_id": "2011_09_26_drive_0051_sync",
+      "split": "train",
+      "frames": 438,
+      "invalid_geometry_frames": 0,
+      "valid_token_fraction": 0.9972174657534246,
+      "sha256": "c21b76ff83d7cb38b978158f7534a6296137993914bf48de4a4de28a5c2169b6"
+    },
+    {
+      "scene_id": "2011_09_26_drive_0059_sync",
+      "split": "test",
+      "frames": 373,
+      "invalid_geometry_frames": 0,
+      "valid_token_fraction": 0.9995810991957105,
+      "sha256": "861567d66fddb167000099c495c2d48cd6181019d50a4f7d40ef147c8320e3f6"
+    },
+    {
+      "scene_id": "2011_09_26_drive_0061_sync",
+      "split": "train",
+      "frames": 703,
+      "invalid_geometry_frames": 0,
+      "valid_token_fraction": 1.0,
+      "sha256": "14f5d4e01e2d0de8b1d7223bcdca783ec722e69c3d12a5111cded459a22c63ae"
+    },
+    {
+      "scene_id": "2011_09_26_drive_0064_sync",
+      "split": "train",
+      "frames": 570,
+      "invalid_geometry_frames": 0,
+      "valid_token_fraction": 0.9986842105263158,
+      "sha256": "ac9f43797bdcaa729bbf88a7ecba21ede4646c3c859a74fc31ec6f65b176a0b4"
+    },
+    {
+      "scene_id": "2011_09_26_drive_0070_sync",
+      "split": "train",
+      "frames": 420,
+      "invalid_geometry_frames": 0,
+      "valid_token_fraction": 0.99140625,
+      "sha256": "ade5fc7cde817d9d9e939298fb0a5daed1ed03f449740ffa5d6c8400db86b6a9"
+    },
+    {
+      "scene_id": "2011_09_26_drive_0084_sync",
+      "split": "train",
+      "frames": 383,
+      "invalid_geometry_frames": 0,
+      "valid_token_fraction": 0.9996736292428199,
+      "sha256": "dc96702e9fcadc3f4a659be7cced1aee9fc75701d39737bad2afd833b412325f"
+    },
+    {
+      "scene_id": "2011_09_26_drive_0091_sync",
+      "split": "train",
+      "frames": 340,
+      "invalid_geometry_frames": 0,
+      "valid_token_fraction": 0.9993106617647058,
+      "sha256": "4efe8b38f52a4b18c645843e0bcbdc2ffffc9750202b4993b175e6ba26debb0c"
+    },
+    {
+      "scene_id": "2011_09_26_drive_0093_sync",
+      "split": "train",
+      "frames": 433,
+      "invalid_geometry_frames": 0,
+      "valid_token_fraction": 0.9946954387990762,
+      "sha256": "a57d83002b1e618070c9d548148f67abc4cd559f88ef37a11f96ec7dad7813d7"
+    },
+    {
+      "scene_id": "2011_09_26_drive_0101_sync",
+      "split": "train",
+      "frames": 936,
+      "invalid_geometry_frames": 0,
+      "valid_token_fraction": 0.9908019497863247,
+      "sha256": "b2c134ac02288c26ce6c09f1c19ecca9cc3451aab723227bae9fb6876f0bf1b1"
+    },
+    {
+      "scene_id": "2011_09_26_drive_0104_sync",
+      "split": "train",
+      "frames": 312,
+      "invalid_geometry_frames": 0,
+      "valid_token_fraction": 0.9999499198717948,
+      "sha256": "7fdf324f3bd71163e94f9d9ca97a36d5b94c47b347e53cb044cce8befc3b3461"
+    },
+    {
+      "scene_id": "2011_09_26_drive_0013_sync",
+      "split": "val",
+      "frames": 144,
+      "invalid_geometry_frames": 0,
+      "valid_token_fraction": 0.9993489583333334,
+      "sha256": "dbd942ba271a160075a3c06f5da2922d79bdbadbb36744c84a8e9734d23060f3"
+    },
+    {
+      "scene_id": "2011_09_26_drive_0056_sync",
+      "split": "val",
+      "frames": 294,
+      "invalid_geometry_frames": 0,
+      "valid_token_fraction": 0.9988307823129252,
+      "sha256": "42375422c5f9f680e5dbd164b2832016670797865c2653214165361e67bda01d"
+    },
+    {
+      "scene_id": "2011_09_26_drive_0009_sync",
+      "split": "test",
+      "frames": 447,
+      "invalid_geometry_frames": 0,
+      "valid_token_fraction": 0.9977279082774049,
+      "sha256": "32bd70e076e3b2f473244294667bcc589d7226f7247cd28c53654767bc9f0486"
+    }
+  ],
+  "project_version": "0.4.0",
+  "completed_date": "2026-11-24",
+  "physical_gpu": "0",
+  "max_simultaneous_gpus": 1,
+  "pytorch_memory_fraction": 0.35,
+  "stride": 1,
+  "reference_dataset_sha256": "ad056c5e4cb11acaef5a3926fd0f82ed37c5fc799ea49918c93a1c03047a8cc9",
+  "full_verification_sha256": "ac3c1408314ae8bc1c628a55a2c8be0f76a684a9b126678afa19b30f5fc8fb55",
+  "cache_bytes": 96293138,
+  "frame_processing_seconds": 1179.574365252105,
+  "invalid_reasons": {},
+  "scope": "Full collected KITTI driving subset; causal left-camera DGGT with current stereo scale anchors. Not a new model-training result.",
+  "limitations": [
+    "Reduced width 280 rather than native 518.",
+    "Pseudo-geometry; stereo median scale is not full registration.",
+    "Whole-log splits are not cross-dataset generalization."
+  ]
+}

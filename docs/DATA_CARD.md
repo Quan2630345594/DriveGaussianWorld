@@ -28,7 +28,13 @@ The expanded collection completed and passed raw-source validation on 2026-10-21
 
 The official `0009` source ZIP contains no LiDAR scans for image IDs **177, 178, 179, 180**. The downloaded point-cloud list matches the source archive exactly; camera/OXTS frames remain available. Independent geometry evaluation must use the recorded LiDAR availability rather than inventing point clouds or treating the absence as a transfer failure.
 
-Validation checks complete RGB/OXTS frame IDs, LiDAR source-member availability, increasing camera/OXTS timestamps and alignment within 50 ms, finite OXTS, whole-log mean motion above 1 m/s, PNG signatures/dimensions and XYZI record sizes. It does not run scene reconstruction or train a model. Full raw verification is recorded locally in `data/kitti_driving/raw_validation.json`; per-member CRC32/SHA256 and source archive hashes are in `collection.json`. The new dataset has not been used for a new DGGT cache or model performance claim.
+Validation checks complete RGB/OXTS frame IDs, LiDAR source-member availability, increasing camera/OXTS timestamps and alignment within 50 ms, finite OXTS, whole-log mean motion above 1 m/s, PNG signatures/dimensions and XYZI record sizes. It does not run scene reconstruction or train a model. Full raw verification is recorded locally in `data/kitti_driving/raw_validation.json`; per-member CRC32/SHA256 and source archive hashes are in `collection.json`. The full collection now has a verified causal DGGT cache; it has not been used for a new full-dataset model-training performance claim.
+
+## Completed causal DGGT cache
+
+On 2026-11-24, all **20 logs and 7,915 frames** were processed at stride 1, using only physical GPU 0. The frozen DGGT configuration used width 280, at most 4 historical frames and BF16 autocast; the PyTorch allocator budget was 35% of one card. Frame histories never include future images. Current stereo geometry provides scale anchors. This is a reduced-resolution engineering cache, not a native-width benchmark.
+
+The cache passed episode hashes, numerical/schema checks, exact frame and split coverage, unchanged RGB/motion labels, identical source records and exact causal context checks. It contains **0 entirely invalid geometry frames**, which are explicitly masked if present. Cache data and metadata occupy approximately **96.3 MB**; temporary frame shards were removed. The raw collection remains approximately 28.02 GB. See [DGGT_CACHE_MANIFEST.json](DGGT_CACHE_MANIFEST.json) for model/input hashes, per-log counts and validation provenance.
 
 ## Collection and integrity
 
